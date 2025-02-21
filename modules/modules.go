@@ -4,6 +4,6 @@ package modules
 import (
 	// Los módulos se registran mediante sus funciones init.
 
-	_ "practicev2/internal/categorias"
+	_ "practicev2/internal/users"
 	// Agregar nuevos módulos acá
 )
