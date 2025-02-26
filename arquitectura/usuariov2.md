@@ -8,7 +8,7 @@ erDiagram
         uint64 id PK "Identificador único"
         string documento_tipo "Tipo: DNI, Cédula, etc."
         string documento_numero "Número de documento"
-        string foto "foto"
+        string foto "Foto"
         string nombre "Nombres"
         string apellidos "Apellidos"
         string email "Correo de contacto"
@@ -45,7 +45,6 @@ erDiagram
         string codigo "Ej: ADMIN, VENDEDOR"
         string nombre
         bool activo
-     
         time deleted_at "Borrado lógico"
     }
     
@@ -54,9 +53,9 @@ erDiagram
         uint64 usuario_id FK
         string token "JWT token"
         string refresh_token
-        time fecha_creacion
         time fecha_expiracion       
         bool activa
+        time deleted_at "Borrado lógico"
     }
     
     MODULO {
@@ -74,8 +73,6 @@ erDiagram
         uint64 rol_id FK "Relación con ROL"
         uint64 modulo_id FK "Relación con MODULO"
         bool acceso "Acceso asignado"
-        time fecha_creacion
-        time fecha_actualizacion
         time deleted_at "Borrado lógico"
     }
     

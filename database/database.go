@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -15,10 +16,22 @@ var (
 )
 
 // ConnectDatabase se conecta a MySQL utilizando GORM y configura la variable global DBconn.
-// Se recomienda cargar el DSN desde variables de entorno en producción.
+// Los parámetros de conexión se cargan desde variables de entorno.
 func ConnectDatabase() {
-	// DSN para MySQL: usuario:contraseña@tcp(ruta)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-	dsn := "root:toor@tcp(127.0.0.1:3306)/practicav1?charset=utf8mb4&parseTime=True&loc=Local"
+	user := os.Getenv("DB_USER")
+	password := os.Getenv("DB_PASSWORD")
+	host := os.Getenv("DB_HOST")
+	port := os.Getenv("DB_PORT")
+	name := os.Getenv("DB_NAME")
+
+	if user == "" || password == "" || host == "" || port == "" || name == "" {
+		log.Fatal("Variables de entorno de base de datos incompletas")
+	}
+
+	// Construir el DSN para MySQL: usuario:contraseña@tcp(ruta:puerto)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		user, password, host, port, name)
+
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		NamingStrategy: schema.NamingStrategy{
 			SingularTable: true, // Desactiva la pluralización

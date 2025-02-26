@@ -1,8 +1,6 @@
 package users
 
 import (
-	"practicev2/registry"
-
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -25,6 +23,8 @@ func RegisterRutasComplejas(app *fiber.App) {
 	api.Get("/seed", ExecuteSeed)
 }
 
-func init() {
-	registry.RegisterModule(RegisterRutasComplejas)
-}
+// Se elimina el init().
+// Antes:
+// func init() {
+// 	registry.RegisterModule(RegisterRutasComplejas)
+// }

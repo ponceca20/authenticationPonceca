@@ -1,7 +1,6 @@
 package users
 
 import (
-	"practicev2/registry"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -168,8 +167,4 @@ func RegisterRoutes2(app *fiber.App) {
 	api.Put("/:id", h.UpdateUsuario)
 	api.Patch("/:id", h.PatchUsuario)
 	api.Delete("/:id", h.DeleteUsuario)
-}
-
-func init() {
-	registry.RegisterModule(RegisterRoutes2)
 }

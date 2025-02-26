@@ -4,6 +4,7 @@ package modules
 import (
 	// Los módulos se registran mediante sus funciones init.
 
-	_ "practicev2/internal/users"
+	_ "practicev2/module/login"
+	_ "practicev2/module/middleware"
 	// Agregar nuevos módulos acá
 )
