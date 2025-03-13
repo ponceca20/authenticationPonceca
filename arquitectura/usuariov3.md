@@ -22,41 +22,29 @@ erDiagram
         date fecha_nacimiento "Fecha de nacimiento"
     }
 
-    %% USUARIO: cada registro incluye el sistema al que pertenece la cuenta
+    %% USUARIO: cuenta para acceso al sistema
     USUARIO {
         uint64 id PK "Identificador único"
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
         uint64 persona_id FK "Referencia a PERSONA"
-        uint64 sistema_id FK "Referencia al SISTEMA (para acceso con DNI y contraseña)"
-        string password_hash "Contraseña específica (null si OAuth)"
-        uint64 empresa_id FK "Referencia a EMPRESA (Microservicio)"
-        bool activo
-        uint64 creado_por FK
-        uint64 actualizado_por FK
-        timestamp last_login_at "Último acceso"
+        string password_hash "Contraseña encriptada"
+        bool activo "Estado del usuario"
+        uint64 creado_por FK "Usuario que creó el registro"
+        uint64 actualizado_por FK "Usuario que actualizó el registro"
     }
 
-    %% SISTEMA configurado vía formulario
-    SISTEMA {
-        uint64 id PK "Identificador único"
-        timestamp created_at "Fecha de creación"
-        timestamp updated_at "Fecha de actualización"
-        timestamp deleted_at "Fecha de borrado"
-        string nombre "Nombre del sistema (configurado vía formulario)"
-        string url "Ruta de acceso (configurada vía formulario; roles y módulos deben estar predefinidos)"
-    }
-
+    %% ROL: define los permisos en el sistema
     ROL {
         uint64 id PK "Identificador único"
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
-        uint64 sistema_id FK "Referencia a SISTEMA para rol global"
+        uint64 empresa_id FK "Referencia a EMPRESA"
         string codigo "Ej: ADMIN, VENDEDOR"
-        string nombre
-        bool activo
+        string nombre "Nombre del rol"
+        bool activo "Estado del rol"
     }
 
     %% Módulos y atribución de roles en módulos
@@ -65,11 +53,10 @@ erDiagram
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
-        uint64 sistema_id FK "Referencia al SISTEMA"
         string codigo "Ej: VENTAS, INVENTARIO"
-        string nombre
+        string nombre "Nombre del módulo"
         string ruta "Ruta en la aplicación"
-        bool activo
+        bool activo "Estado del módulo"
         int orden "Orden de visualización"
     }
 
@@ -89,31 +76,47 @@ erDiagram
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
-        uint64 usuario_id FK
+        uint64 usuario_id FK "Referencia a USUARIO"
         string token "JWT token"
         string refresh_token "Token de renovación"
-        timestamp expires_at "Fecha de expiración"
-        timestamp last_accessed_at "Último acceso durante la sesión"
-        bool activa
+        timestamp fecha_expiracion "Fecha de expiración"
+        bool activa "Estado de la sesión"
+        string ip "Dirección IP"
     }
 
-    %% USUARIO_EMPRESA: se elimina el campo sistema_id ya que USUARIO define a qué sistema pertenece
+    %% USUARIO_EMPRESA: relación entre usuarios y empresas con roles
     USUARIO_EMPRESA {
         uint64 id PK "Identificador único"
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
         uint64 usuario_id FK "Referencia al usuario"
-        uint64 empresa_id FK "Referencia a EMPRESA (Microservicio)"
-        uint64 rol_id FK "Rol asignado a usuario en la empresa/sistema"
+        uint64 empresa_id FK "Referencia a EMPRESA"
+        uint64 rol_id FK "Rol asignado a usuario en la empresa"
+        timestamp fecha_asignacion "Fecha en que se asignó el rol"
     }
 
+    %% Control de intentos de inicio de sesión
+    LOGIN_ATTEMPT {
+        uint64 id PK "Identificador único"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Fecha de actualización"
+        timestamp deleted_at "Fecha de borrado"
+        string identifier "Email o nombre de usuario (puede no corresponder a usuario válido)"
+        string ip "Dirección IP del intento"
+        bool success "Si el intento fue exitoso"
+    }
+
+    %% Nota: LOGIN_ATTEMPT no tiene relaciones directas ya que registra todos los intentos 
+    %% de inicio de sesión, incluyendo aquellos con credenciales inválidas o usuarios que no existen.
+    %% Su propósito es detectar intentos de acceso no autorizados, ataques de fuerza bruta
+    %% y proporcionar información para auditorías de seguridad del sistema.
+
     %% Relaciones
+    PERSONA ||--o{ USUARIO : "tiene"
     USUARIO ||--o{ SESION : "tiene"
-    SISTEMA ||--o{ MODULO : "tiene"
     ROL ||--o{ ROL_MODULO : "asigna"
     MODULO ||--o{ ROL_MODULO : "autoriza"
     USUARIO ||--o{ USUARIO_EMPRESA : "tiene acceso a"
-    SISTEMA ||--o{ USUARIO : "define cuenta para"
     ROL ||--|{ USUARIO_EMPRESA : "asignado en"
 :::

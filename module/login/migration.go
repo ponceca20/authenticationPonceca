@@ -8,6 +8,10 @@ import (
 
 // Migrate ejecuta la migración de las tablas de usuarios en el orden correcto.
 func Migrate(db *gorm.DB) error {
+	// Migrar LoginAttempt (independiente)
+	if err := db.AutoMigrate(&LoginAttempt{}); err != nil {
+		return err
+	}
 	// Primero se migra Persona (no tiene dependencias)
 	if err := db.AutoMigrate(&Persona{}); err != nil {
 		return err
@@ -36,6 +40,7 @@ func Migrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(&RolModulo{}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
