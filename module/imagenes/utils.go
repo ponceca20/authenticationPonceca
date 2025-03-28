@@ -33,6 +33,10 @@ func GetFileExtensionFromMime(mimeType string) string {
 		return ".webp"
 	case "image/svg+xml":
 		return ".svg"
+	case "image/gif":
+		return ".gif"
+	case "image/bmp":
+		return ".bmp"
 	default:
 		return ""
 	}

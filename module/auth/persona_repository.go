@@ -1,4 +1,4 @@
-package users
+package auth
 
 import (
 	"errors"
@@ -40,7 +40,7 @@ func (r *personaRepo) GetAllPersonas() ([]Persona, error) {
 func (r *personaRepo) GetPersona(id uint) (Persona, error) {
 	var persona Persona
 	// Cambiado Preload("DocumentoTipo") a Preload("TipoDocumento")
-	err := r.DB.Preload("TipoDocumento").First(&persona, id).Error
+	err := r.DB.First(&persona, id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return persona, fmt.Errorf("persona con id %d no encontrada", id)

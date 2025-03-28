@@ -1,4 +1,4 @@
-package users
+package auth
 
 import (
 	"practicev2/registry"

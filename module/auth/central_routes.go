@@ -1,4 +1,4 @@
-package users
+package auth
 
 import (
 	"github.com/gofiber/fiber/v2"
@@ -20,6 +20,7 @@ func RegisterCentralRoutes(app *fiber.App) {
 	RegisterRoutesPersona(app)
 	RegisterRoutesModulo(app)
 	RegisterRutasComplejas(app)
+
 }
 
 // Añadido init para registrar este módulo en el registry.

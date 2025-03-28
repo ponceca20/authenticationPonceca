@@ -3,6 +3,7 @@ package imagenes
 import (
 	"errors"
 	"practicev2/database"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -14,6 +15,7 @@ type ImageRepository interface {
 	CreateImage(image *Image) error
 	UpdateImage(image *Image) error
 	DeleteImage(id string) error
+	GetExpiredTemporaryImages(cutoff time.Time) ([]Image, error)
 }
 
 type imageRepo struct {
@@ -54,9 +56,16 @@ func (r *imageRepo) UpdateImage(image *Image) error {
 
 // DeleteImage elimina físicamente una imagen de la base de datos usando la clave primaria "id"
 func (r *imageRepo) DeleteImage(id string) error {
-	result := r.DB.Delete(&Image{}, id)
+	result := r.DB.Unscoped().Delete(&Image{}, id) // Hard delete: elimina completamente el registro
 	if result.RowsAffected == 0 {
 		return ErrImageNotFound
 	}
 	return result.Error
+}
+
+func (r *imageRepo) GetExpiredTemporaryImages(cutoff time.Time) ([]Image, error) {
+	var images []Image
+	// Se utiliza "status_permanente" para coincidir con el nombre del campo en la DB
+	err := r.DB.Where("status_permanente = ? AND expires_at < ?", false, cutoff).Find(&images).Error
+	return images, err
 }

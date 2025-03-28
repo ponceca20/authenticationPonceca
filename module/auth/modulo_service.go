@@ -1,4 +1,4 @@
-package users
+package auth
 
 // ModuloService contiene la lógica de negocio para módulos
 type ModuloService struct {

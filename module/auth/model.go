@@ -1,4 +1,4 @@
-package users
+package auth
 
 import (
 	"time"
@@ -17,120 +17,98 @@ type LoginAttempt struct {
 // TipoDocumentoSunat representa la tabla TIPO_DOCUMENTO_SUNAT
 type TipoDocumentoSunat struct {
 	gorm.Model
-	Codigo string `gorm:"type:varchar(10);unique;not null"`
-	Nombre string `gorm:"type:varchar(100);not null"`
-	// Se reintroduce la relación para que GORM genere la FK
-	Personas []*Persona `gorm:"foreignKey:TipoDocumentoID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
+	Codigo string `json:"codigo" gorm:"type:varchar(20);index"`
+	Nombre string `json:"nombre" gorm:"type:varchar(100)"`
+	// Relaciones
+	Personas []*Persona `json:"personas,omitempty" gorm:"foreignKey:TipoDocumentoID"`
 }
 
-// Persona representa la tabla PERSONA
+// Persona representa la tabla PERSONA.
 type Persona struct {
 	gorm.Model
-	TipoDocumentoID    uint64    `gorm:"not null"`
-	DocumentoNumero    string    `gorm:"type:varchar(20)"`
-	Foto               string    `gorm:"type:varchar(255)"`
-	Nombre             string    `gorm:"type:varchar(100)"`
-	Apellidos          string    `gorm:"type:varchar(100)"`
-	Email              string    `gorm:"type:varchar(100);uniqueIndex"`
-	Telefono           string    `gorm:"type:varchar(20)"`
-	TelefonoSecundario string    `gorm:"type:varchar(20)"`
-	Direccion          string    `gorm:"type:varchar(255)"`
-	FechaNacimiento    time.Time `gorm:"type:date"`
-	// Se reintroduce la relación para crear la restricción FK
-	TipoDocumento TipoDocumentoSunat `gorm:"foreignKey:TipoDocumentoID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
-	// Relación uno a uno con Usuario
-	Usuario *Usuario `gorm:"foreignKey:PersonaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL;" json:"-"`
+	TipoDocumentoID    uint64              `json:"tipo_documento_id" gorm:"index"`
+	TipoDocumento      *TipoDocumentoSunat `json:"tipo_documento,omitempty" gorm:"foreignKey:TipoDocumentoID"`
+	DocumentoNumero    string              `json:"documento_numero" gorm:"type:varchar(20);index"`
+	Foto               string              `json:"foto" gorm:"type:varchar(255)"`
+	Nombre             string              `json:"nombre" gorm:"type:varchar(255)"`
+	Apellidos          string              `json:"apellidos" gorm:"type:varchar(255)"`
+	Email              string              `json:"email" gorm:"type:varchar(255);index"`
+	Telefono           string              `json:"telefono" gorm:"type:varchar(20)"`
+	TelefonoSecundario string              `json:"telefono_secundario" gorm:"type:varchar(20)"`
+	Direccion          string              `json:"direccion" gorm:"type:text"`
+	FechaNacimiento    time.Time           `json:"fecha_nacimiento" gorm:"type:date"`
+	// Relaciones
+	Usuario *Usuario `json:"usuario,omitempty" gorm:"foreignKey:PersonaID"`
 }
 
-// Usuario representa la tabla USUARIO
+// Usuario representa la tabla USUARIO.
 type Usuario struct {
 	gorm.Model
-	PersonaID      uint64 `json:"persona_id" gorm:"uniqueIndex"`
-	PasswordHash   string `json:"password_hash" gorm:"type:varchar(255);not null"`
-	Activo         bool   `json:"activo" gorm:"default:true"`
-	CreadoPor      uint64 `json:"creado_por"`
-	ActualizadoPor uint64 `json:"actualizado_por"`
-	// Relación con Persona (un usuario tiene una persona)
-	Persona Persona `gorm:"foreignKey:PersonaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
-	// Un usuario puede tener muchas sesiones y relaciones con empresas
-	Sesiones        []*Sesion         `gorm:"foreignKey:UsuarioID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	UsuarioEmpresas []*UsuarioEmpresa `gorm:"foreignKey:UsuarioID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-}
-
-// Empresa representa la tabla EMPRESA (implícita en la relación USUARIO_EMPRESA y ROL)
-type Empresa struct {
-	gorm.Model
-	// Campos básicos de empresa
-	Nombre    string `json:"nombre" gorm:"type:varchar(200);not null"`
-	RUC       string `json:"ruc" gorm:"type:varchar(11);uniqueIndex"`
-	Direccion string `json:"direccion" gorm:"type:varchar(255)"`
-	Activo    bool   `json:"activo" gorm:"default:true"`
+	PersonaID      uint64   `json:"persona_id" gorm:"index"`
+	Persona        *Persona `json:"persona,omitempty" gorm:"foreignKey:PersonaID"`
+	PasswordHash   string   `json:"password_hash" gorm:"type:varchar(250)"` // Para bcrypt
+	Activo         bool     `json:"activo" gorm:"default:true;index"`
+	CreadoPor      uint64   `json:"creado_por" gorm:"index"`
+	ActualizadoPor uint64   `json:"actualizado_por"`
 	// Relaciones
-	UsuarioEmpresas []*UsuarioEmpresa `gorm:"foreignKey:EmpresaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	Roles           []*Rol            `gorm:"foreignKey:EmpresaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	Sesiones        []*Sesion         `json:"sesiones,omitempty" gorm:"foreignKey:UsuarioID"`
+	UsuarioEmpresas []*UsuarioEmpresa `json:"usuario_empresas,omitempty" gorm:"foreignKey:UsuarioID"`
 }
 
-// UsuarioEmpresa representa la tabla USUARIO_EMPRESA
+// UsuarioEmpresa representa la tabla USUARIO_EMPRESA.
 type UsuarioEmpresa struct {
 	gorm.Model
-	UsuarioID       uint64    `json:"usuario_id" gorm:"index;not null"`
-	EmpresaID       uint64    `json:"empresa_id" gorm:"index;not null"`
-	RolID           uint64    `json:"rol_id" gorm:"index;not null"`
-	FechaAsignacion time.Time `json:"fecha_asignacion" gorm:"default:CURRENT_TIMESTAMP"`
-	// Relación con Usuario
-	Usuario Usuario `gorm:"foreignKey:UsuarioID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	// Relación con Empresa
-	Empresa Empresa `gorm:"foreignKey:EmpresaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	// Relación con Rol
-	Rol Rol `gorm:"foreignKey:RolID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT;" json:"-"`
+	UsuarioID       uint64    `json:"usuario_id" gorm:"index"`
+	Usuario         *Usuario  `json:"usuario,omitempty" gorm:"foreignKey:UsuarioID"`
+	EmpresaID       uint64    `json:"empresa_id" gorm:"index"`
+	RolID           uint64    `json:"rol_id" gorm:"index"`
+	Rol             *Rol      `json:"rol,omitempty" gorm:"foreignKey:RolID"`
+	FechaAsignacion time.Time `json:"fecha_asignacion"`
+	ActiveSesion    bool      `json:"activo" gorm:"default:true;index"`
 }
 
-// Rol representa la tabla ROL
+// Rol representa la tabla ROL.
 type Rol struct {
 	gorm.Model
-	EmpresaID uint64 `json:"empresa_id" gorm:"index;not null"`
-	Codigo    string `json:"codigo" gorm:"type:varchar(50);not null"`
-	Nombre    string `json:"nombre" gorm:"type:varchar(100);not null"`
-	Activo    bool   `json:"activo" gorm:"default:true"`
-	// Relación con Empresa
-	Empresa Empresa `gorm:"foreignKey:EmpresaID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	// Un rol puede estar relacionado a muchos UsuarioEmpresa y RolModulo
-	UsuarioEmpresas []*UsuarioEmpresa `gorm:"foreignKey:RolID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	RolModulos      []*RolModulo      `gorm:"foreignKey:RolID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	EmpresaID uint64 `json:"empresa_id" gorm:"index"`
+	Codigo    string `json:"codigo" gorm:"type:varchar(50);uniqueIndex"`
+	Nombre    string `json:"nombre" gorm:"type:varchar(250)"`
+	Activo    bool   `json:"activo" gorm:"default:true;index"`
+	// Relaciones
+	UsuarioEmpresas []*UsuarioEmpresa `json:"usuario_empresas,omitempty" gorm:"foreignKey:RolID"`
+	RolModulos      []*RolModulo      `json:"rol_modulos,omitempty" gorm:"foreignKey:RolID"`
 }
 
-// Sesion representa la tabla SESION
+// Sesion representa la tabla SESION.
 type Sesion struct {
 	gorm.Model
-	UsuarioID       uint64    `json:"usuario_id" gorm:"index;not null"`
-	Token           string    `json:"token" gorm:"type:text;not null"`
-	RefreshToken    string    `json:"refresh_token" gorm:"type:text"`
-	FechaExpiracion time.Time `json:"fecha_expiracion" gorm:"not null"`
-	Activa          bool      `json:"activa" gorm:"default:true"`
-	IP              string    `json:"ip" gorm:"type:varchar(45)"`
-	// Relación con Usuario
-	Usuario Usuario `gorm:"foreignKey:UsuarioID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	UsuarioID       uint64    `json:"usuario_id" gorm:"index"`
+	Usuario         *Usuario  `json:"usuario,omitempty" gorm:"foreignKey:UsuarioID"`
+	Token           string    `json:"token" gorm:"type:varchar(500)"`
+	RefreshToken    string    `json:"refresh_token" gorm:"type:varchar(500)"`
+	FechaExpiracion time.Time `json:"fecha_expiracion" gorm:"type:timestamp;index"`
+	Activa          bool      `json:"activa" gorm:"default:true;index"`
+	IP              string    `json:"ip" gorm:"type:varchar(45);index"`
 }
 
-// Modulo representa la tabla MODULO
+// Modulo representa la tabla MODULO.
 type Modulo struct {
 	gorm.Model
-	Codigo string `json:"codigo" gorm:"type:varchar(50);unique;not null"`
-	Nombre string `json:"nombre" gorm:"type:varchar(100);not null"`
+	Codigo string `json:"codigo" gorm:"type:varchar(50);uniqueIndex"`
+	Nombre string `json:"nombre" gorm:"type:varchar(100)"`
 	Ruta   string `json:"ruta" gorm:"type:varchar(255)"`
-	Activo bool   `json:"activo" gorm:"default:true"`
-	Orden  int    `json:"orden" gorm:"default:0"`
-	// Un módulo puede estar relacionado a muchos RolModulo
-	RolModulos []*RolModulo `gorm:"foreignKey:ModuloID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	Activo bool   `json:"activo" gorm:"default:true;index"`
+	Orden  int    `json:"orden" gorm:"type:int"`
+	// Relaciones
+	RolModulos []*RolModulo `json:"rol_modulos,omitempty" gorm:"foreignKey:ModuloID"`
 }
 
-// RolModulo representa la tabla ROL_MODULO
+// RolModulo representa la tabla ROL_MODULO.
 type RolModulo struct {
 	gorm.Model
-	RolID    uint64 `json:"rol_id" gorm:"index;not null"`
-	ModuloID uint64 `json:"modulo_id" gorm:"index;not null"`
-	Acceso   bool   `json:"acceso" gorm:"default:false"`
-	// Relaciones para materializar la FK
-	Rol    Rol    `gorm:"foreignKey:RolID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
-	Modulo Modulo `gorm:"foreignKey:ModuloID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"-"`
+	RolID    uint64  `json:"rol_id" gorm:"index"`
+	Rol      *Rol    `json:"rol,omitempty" gorm:"foreignKey:RolID"`
+	ModuloID uint64  `json:"modulo_id" gorm:"index"`
+	Modulo   *Modulo `json:"modulo,omitempty" gorm:"foreignKey:ModuloID"`
+	Acceso   bool    `json:"acceso"`
 }

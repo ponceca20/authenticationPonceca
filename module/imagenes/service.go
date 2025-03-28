@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv" // nueva importación
+	"time"    // agregado para manejar expiración
 
+	"github.com/chai2010/webp" // nueva importación para conversión a WebP
 	"github.com/disintegration/imaging"
 )
 
@@ -40,9 +42,22 @@ func NewImageService(repo ImageRepository, basePath, baseURL string) *ImageServi
 	}
 }
 
+// saveWebP guarda la imagen en formato WebP usando opciones recomendadas
+func saveWebP(path string, img image.Image) error {
+	out, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	// Usar compresión con calidad 80; se puede ajustar según necesidad
+	options := &webp.Options{Lossless: false, Quality: 80}
+	return webp.Encode(out, img, options)
+}
+
 // UploadImage maneja la carga de una nueva imagen utilizando la ID del registro
 func (s *ImageService) UploadImage(file *multipart.FileHeader, userID string, imageType ImageType, empresaID, family string) (*Image, error) {
 	// Validaciones
+
 	if file.Size > s.MaxFileSize {
 		return nil, ErrFileTooLarge
 	}
@@ -51,10 +66,8 @@ func (s *ImageService) UploadImage(file *multipart.FileHeader, userID string, im
 		return nil, ErrUnsupportedType
 	}
 
-	ext := filepath.Ext(file.Filename)
-	if ext == "" {
-		ext = GetFileExtensionFromMime(mimeType)
-	}
+	// Forzar conversión a formato .webp antes de redimensionar
+	ext := ".webp"
 
 	// Decodificar la imagen
 	src, err := file.Open()
@@ -89,6 +102,8 @@ func (s *ImageService) UploadImage(file *multipart.FileHeader, userID string, im
 		ImageType:        imageType,
 		EmpresaID:        uint(empID),
 		Family:           family,
+		StatusPermanente: false, // false: temporal
+		ExpiresAt:        time.Now().Add(1 * time.Hour),
 		// FilePath, ThumbnailPath y MediumPath se asignarán luego
 	}
 	if err := s.Repo.CreateImage(imageRecord); err != nil {
@@ -101,8 +116,8 @@ func (s *ImageService) UploadImage(file *multipart.FileHeader, userID string, im
 	thumbPath := filepath.Join(s.BasePath, idStr+"_thumb"+ext)
 	mediumPath := filepath.Join(s.BasePath, idStr+"_medium"+ext)
 
-	// Guardar imagen original
-	if err = imaging.Save(img, originalPath); err != nil {
+	// Guardar imagen original en WebP
+	if err = saveWebP(originalPath, img); err != nil {
 		log.Printf("Error al guardar imagen original: %v", err)
 		return nil, err
 	}
@@ -121,13 +136,14 @@ func (s *ImageService) UploadImage(file *multipart.FileHeader, userID string, im
 		mediumImg = img
 	}
 
-	if err = imaging.Save(thumbImg, thumbPath); err != nil {
+	// Guardar miniatura en WebP
+	if err = saveWebP(thumbPath, thumbImg); err != nil {
 		log.Printf("Error al guardar la imagen miniatura: %v", err)
 		os.Remove(originalPath)
-		// Se podría eliminar el registro en caso de error
 		return nil, err
 	}
-	if err = imaging.Save(mediumImg, mediumPath); err != nil {
+	// Guardar imagen mediana en WebP
+	if err = saveWebP(mediumPath, mediumImg); err != nil {
 		log.Printf("Error al guardar la imagen mediana: %v", err)
 		os.Remove(originalPath)
 		os.Remove(thumbPath)
@@ -183,4 +199,49 @@ func (s *ImageService) DeleteImage(id string) error {
 func (s *ImageService) GetImageURL(image Image) string {
 	filename := filepath.Base(image.FilePath)
 	return fmt.Sprintf("%s/%s", s.BaseURL, filename)
+}
+
+// CleanupTemporaryImages ahora es una función interna que solo se ejecuta
+// después de operaciones específicas
+func (s *ImageService) CleanupTemporaryImages() error {
+	// Obtener solo imágenes que hayan expirado hace más de 1 hora
+	// para evitar conflictos con operaciones en curso
+	cutoff := time.Now().Add(-1 * time.Hour)
+	images, err := s.Repo.GetExpiredTemporaryImages(cutoff)
+	if err != nil {
+		return err
+	}
+
+	for _, img := range images {
+		// Eliminar solo si la imagen sigue siendo temporal
+		// (doble verificación para evitar condiciones de carrera)
+		if !img.StatusPermanente { // false indica temporal
+			if err := s.DeleteImage(fmt.Sprintf("%d", img.ID)); err != nil {
+				log.Printf("Error deleting expired image %d: %v", img.ID, err)
+			}
+		}
+	}
+	return nil
+}
+
+// UpdateImageStatus actualiza el estado de permanencia de una imagen
+func (s *ImageService) UpdateImageStatus(id string, newStatus bool) error {
+	// Obtener imagen
+	image, err := s.Repo.GetImageByID(id)
+	if err != nil {
+		return err
+	}
+
+	// Actualizar estado y establecer ExpiresAt:
+	image.StatusPermanente = newStatus
+	if newStatus {
+		// Imagen permanente: fecha muy lejana
+		image.ExpiresAt = time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC)
+	} else {
+		// Imagen temporal: expira en 1 hora desde ahora
+		image.ExpiresAt = time.Now().Add(1 * time.Hour)
+	}
+
+	// Actualizar registro en la base de datos
+	return s.Repo.UpdateImage(&image)
 }

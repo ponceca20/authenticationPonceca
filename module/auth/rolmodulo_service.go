@@ -1,4 +1,4 @@
-package users
+package auth
 
 // RolModuloService contiene la lógica de negocio para RolModulo
 type RolModuloService struct {

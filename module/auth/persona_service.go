@@ -1,4 +1,4 @@
-package users
+package auth
 
 // PersonaService contiene la lógica de negocio para Persona.
 type PersonaService struct {

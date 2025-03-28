@@ -23,11 +23,10 @@ func RegisterRoutes(app *fiber.App) {
 			panic("Unable to create upload directory: " + err.Error())
 		}
 	}
-	base_api := "/api/images"
-	host := os.Getenv("APP_HOST")
-	port := os.Getenv("APP_PORT")
+	base_api := "/serverimage"
+
 	// Update la baseURL usando siempre APP_HOST y APP_PORT
-	baseURLimg := host + ":" + port + base_api + "/serve"
+	baseURLimg := base_api + "/serve"
 
 	// Create repository, service and handler
 	repo := NewImageRepository()
@@ -45,7 +44,7 @@ func RegisterRoutes(app *fiber.App) {
 	// Protected routes
 	api.Post("/upload", middleware.AuthMiddleware(), handler.UploadImage)
 	api.Delete("/:id", middleware.AuthMiddleware(), handler.DeleteImage)
-
+	api.Put("/status", middleware.AuthMiddleware(), handler.UpdateImageStatus)
 }
 
 func init() {

@@ -1,4 +1,4 @@
-package users
+package auth
 
 // SesionService contiene la lógica de negocio para sesiones
 type SesionService struct {

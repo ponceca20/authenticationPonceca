@@ -30,8 +30,10 @@ func main() {
 	database.ConnectDatabase()
 	// Ejecuta las migraciones de forma secuencial.
 	registry.RunMigrations(database.DBconn)
-	app := fiber.New()
-
+	//app := fiber.New()
+	app := fiber.New(fiber.Config{
+		BodyLimit: 10 * 1024 * 1024, // 50MB in bytes
+	})
 	// Actualización de configuración CORS mejorada para mejor compatibilidad con HTTPS
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "https://localhost:3000,http://localhost:3000,https://192.168.1.36:3000,http://192.168.1.36:3000",

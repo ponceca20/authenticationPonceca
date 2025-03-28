@@ -11,6 +11,11 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
+// Nuevo struct para representación mínima de empresa.
+type MinimalCompany struct {
+	EmpresaID uint64 `json:"empresa_id"`
+}
+
 // Variables para configuración
 const (
 	cookieName      = "auth_token"
@@ -104,18 +109,49 @@ func isTokenRevoked(tokenString string) bool {
 	return exists
 }
 
+// Helper para extraer y asignar los datos de usuario, persona y companies en el contexto.
+func setContextFromClaims(c *fiber.Ctx, claims jwt.MapClaims) error {
+	uid, ok := claims["usuario_id"].(float64)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "Token inválido: falta o formato incorrecto de usuario_id")
+	}
+	c.Locals("usuario_id", uint64(uid))
+
+	pid, ok := claims["persona_id"].(float64)
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "Token inválido: falta o formato incorrecto de persona_id")
+	}
+	c.Locals("persona_id", uint64(pid))
+
+	companiesData, ok := claims["companies"].([]interface{})
+	if !ok {
+		return fiber.NewError(fiber.StatusUnauthorized, "Token inválido: falta o formato incorrecto de companies")
+	}
+	companies := make([]MinimalCompany, 0, len(companiesData))
+	for _, compData := range companiesData {
+		cm, ok := compData.(map[string]interface{})
+		if !ok {
+			return fiber.NewError(fiber.StatusUnauthorized, "Token inválido: estructura incorrecta en companies")
+		}
+		id, ok := cm["empresa_id"].(float64)
+		if !ok {
+			return fiber.NewError(fiber.StatusUnauthorized, "Token inválido: falta o formato incorrecto de empresa_id en companies")
+		}
+		companies = append(companies, MinimalCompany{EmpresaID: uint64(id)})
+	}
+	c.Locals("companies", companies)
+	c.Locals("user", claims)
+
+	return nil
+}
+
 // AuthMiddleware verifica si el usuario está autenticado
 func AuthMiddleware() fiber.Handler {
-	// Asegurar que la limpieza de tokens esté activa
 	StartTokenCleanup()
-	// Preparar la clave JWT una sola vez para reutilizarla
-	jwtKey := config.GetJWTKey()
-
 	return func(c *fiber.Ctx) error {
-		// Intentar obtener el token primero desde la cookie HTTP-only
-		tokenString := c.Cookies(cookieName)
 
-		// Si no hay cookie, intentar desde el header de autorización como fallback
+		// Obtener token de cookie
+		tokenString := c.Cookies(cookieName)
 		if tokenString == "" {
 			authHeader := c.Get("Authorization")
 			if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
@@ -131,7 +167,7 @@ func AuthMiddleware() fiber.Handler {
 			})
 		}
 
-		// Verificar si el token está en la lista negra (rápido)
+		// Verificar si el token está en la lista negra
 		if isTokenRevoked(tokenString) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Token revocado o en lista negra",
@@ -141,21 +177,28 @@ func AuthMiddleware() fiber.Handler {
 
 		// Verificar si el token está en caché
 		if cachedClaims, found := tokenCache.Get(tokenString); found {
-			// Token encontrado en caché, usar claims almacenados
-			c.Locals("user", cachedClaims)
+			claims, ok := cachedClaims.(jwt.MapClaims)
+			if !ok {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "Token inválido en caché: estructura de claims incorrecta",
+					"code":  "AUTH_INVALID_CLAIMS",
+				})
+			}
+			if err := setContextFromClaims(c, claims); err != nil {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
+			}
 			return c.Next()
 		}
 
 		// Validar el token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Verificar el método de firma
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fiber.NewError(fiber.StatusUnauthorized, "Método de firma JWT inválido")
 			}
-			return jwtKey, nil
+			key := config.GetJWTKey()
+			return key, nil
 		})
 
-		// Verificar errores durante la validación
 		if err != nil || !token.Valid {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"error": "Token inválido o expirado",
@@ -172,7 +215,7 @@ func AuthMiddleware() fiber.Handler {
 			})
 		}
 
-		// Verificar expiración
+		// Verificar expiración y guardar en caché
 		if exp, ok := claims["exp"].(float64); ok {
 			expTime := time.Unix(int64(exp), 0)
 			if expTime.Before(time.Now()) {
@@ -181,28 +224,18 @@ func AuthMiddleware() fiber.Handler {
 					"code":  "AUTH_TOKEN_EXPIRED",
 				})
 			}
-
-			// Calcular TTL para caché basado en expiración del token
 			remaining := time.Until(expTime)
 			cacheTTL := tokenCacheTTL
 			if remaining < tokenCacheTTL {
 				cacheTTL = remaining
 			}
-
-			// Guardar en caché para futuras validaciones
 			tokenCache.Set(tokenString, claims, cacheTTL)
 		}
 
-		// Verificar y extraer usuario_id con manejo seguro de tipos
-		_, ok = claims["usuario_id"].(float64)
-		if !ok {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Token inválido: falta o formato incorrecto de usuario_id",
-				"code":  "AUTH_INVALID_USER_ID",
-			})
+		// Establecer el contexto a partir de los claims
+		if err := setContextFromClaims(c, claims); err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 		}
-
-		// Almacenar claims en el contexto
 
 		return c.Next()
 	}

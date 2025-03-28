@@ -1,10 +1,12 @@
-package users
+package auth
 
 import (
 	"fmt"
 	"time"
 
 	"practicev2/database"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func Seeders() bool {
@@ -14,7 +16,7 @@ func Seeders() bool {
 
 	// Auto-migrate de modelos
 	if err := db.AutoMigrate(
-		&TipoDocumentoSunat{}, // nuevo modelo agregado
+		&TipoDocumentoSunat{},
 		&Persona{},
 		&Usuario{},
 		&UsuarioEmpresa{},
@@ -30,68 +32,82 @@ func Seeders() bool {
 
 	// Insertar datos de ejemplo para TipoDocumentoSunat
 	dni := TipoDocumentoSunat{
-		Codigo: "DNI",
+		Codigo: "01",
 		Nombre: "Documento Nacional de Identidad",
 	}
-	if result := db.FirstOrCreate(&dni, TipoDocumentoSunat{Codigo: "DNI"}); result.Error != nil {
+	if result := db.FirstOrCreate(&dni, TipoDocumentoSunat{Codigo: "01"}); result.Error != nil {
 		fmt.Println("Error creating TipoDocumentoSunat DNI:", result.Error)
+		return false
+	}
+
+	ruc := TipoDocumentoSunat{
+		Codigo: "06",
+		Nombre: "Registro Único de Contribuyentes",
+	}
+	if result := db.FirstOrCreate(&ruc, TipoDocumentoSunat{Codigo: "06"}); result.Error != nil {
+		fmt.Println("Error creating TipoDocumentoSunat RUC:", result.Error)
 		return false
 	}
 
 	// Crear Persona
 	persona1 := Persona{
-		TipoDocumentoID: uint64(dni.ID), // Convertir uint a uint64
-		DocumentoNumero: "12345678",
-		Foto:            "foto1.jpg",
-		Nombre:          "Juan",
-		Apellidos:       "Perez",
-		Email:           "juan@example.com",
-		Telefono:        "123456789",
-		Direccion:       "Calle Falsa 123",
-		FechaNacimiento: time.Date(1990, time.January, 1, 0, 0, 0, 0, time.UTC),
+		TipoDocumentoID:    uint64(dni.ID),
+		DocumentoNumero:    "12345678",
+		Foto:               "foto1.jpg",
+		Nombre:             "Juan",
+		Apellidos:          "Perez",
+		Email:              "juan@example.com",
+		Telefono:           "123456789",
+		TelefonoSecundario: "987654321",
+		Direccion:          "Calle Falsa 123",
+		FechaNacimiento:    time.Date(1990, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
-	if result := db.Create(&persona1); result.Error != nil {
+	if result := db.FirstOrCreate(&persona1, Persona{DocumentoNumero: "12345678"}); result.Error != nil {
 		fmt.Println("Error creating Persona 1:", result.Error)
 		return false
 	}
 
 	persona2 := Persona{
-		TipoDocumentoID: uint64(dni.ID), // Convertir uint a uint64
+		TipoDocumentoID: uint64(dni.ID),
 		DocumentoNumero: "41822932",
 		Foto:            "foto2.jpg",
 		Nombre:          "Fredy",
 		Apellidos:       "Ponceca",
-		Email:           "maria@example.com",
+		Email:           "fredy@example.com",
 		Telefono:        "987654321",
 		Direccion:       "Avenida Siempre Viva 742",
 		FechaNacimiento: time.Date(1985, time.June, 15, 0, 0, 0, 0, time.UTC),
 	}
-	if result := db.Create(&persona2); result.Error != nil {
+	if result := db.FirstOrCreate(&persona2, Persona{DocumentoNumero: "41822932"}); result.Error != nil {
 		fmt.Println("Error creating Persona 2:", result.Error)
 		return false
 	}
 
+	// Generar password hashes
+	password1, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	password2, _ := bcrypt.GenerateFromPassword([]byte("secret456"), bcrypt.DefaultCost)
+
 	// Crear Usuarios
 	usuario1 := Usuario{
 		PersonaID:      uint64(persona1.ID),
-		PasswordHash:   "$2a$10$00JEz/RCEOdYBhYQ21.L0Orubv776213oNI1t7WWfJuMnFFI6XTS.", // hash para "password123"
+		PasswordHash:   string(password1),
 		Activo:         true,
 		CreadoPor:      1,
 		ActualizadoPor: 1,
 	}
-	if result := db.Create(&usuario1); result.Error != nil {
+	if result := db.FirstOrCreate(&usuario1, Usuario{PersonaID: uint64(persona1.ID)}); result.Error != nil {
 		fmt.Println("Error creating Usuario 1:", result.Error)
 		return false
 	}
 
 	usuario2 := Usuario{
 		PersonaID:      uint64(persona2.ID),
-		PasswordHash:   "$2a$10$k4HT2KkfCPv1/zhDfg1NoeEkV86HMjHvM3ndCGGAiRwBoIppyizEy", // hash para "secret456"
+		PasswordHash:   string(password2),
 		Activo:         true,
 		CreadoPor:      1,
 		ActualizadoPor: 1,
 	}
-	if result := db.Create(&usuario2); result.Error != nil {
+	if result := db.FirstOrCreate(&usuario2, Usuario{PersonaID: uint64(persona2.ID)}); result.Error != nil {
 		fmt.Println("Error creating Usuario 2:", result.Error)
 		return false
 	}
@@ -103,7 +119,7 @@ func Seeders() bool {
 		Nombre:    "Administrador",
 		Activo:    true,
 	}
-	if result := db.Create(&rolAdmin); result.Error != nil {
+	if result := db.FirstOrCreate(&rolAdmin, Rol{Codigo: "ADMIN", EmpresaID: 1}); result.Error != nil {
 		fmt.Println("Error creating Rol Admin:", result.Error)
 		return false
 	}
@@ -114,7 +130,7 @@ func Seeders() bool {
 		Nombre:    "Usuario Regular",
 		Activo:    true,
 	}
-	if result := db.Create(&rolUsuario); result.Error != nil {
+	if result := db.FirstOrCreate(&rolUsuario, Rol{Codigo: "USER", EmpresaID: 1}); result.Error != nil {
 		fmt.Println("Error creating Rol Usuario:", result.Error)
 		return false
 	}
@@ -126,7 +142,10 @@ func Seeders() bool {
 		RolID:           uint64(rolAdmin.ID),
 		FechaAsignacion: time.Now(),
 	}
-	if result := db.Create(&usuarioEmpresa1); result.Error != nil {
+	if result := db.FirstOrCreate(&usuarioEmpresa1, UsuarioEmpresa{
+		UsuarioID: uint64(usuario1.ID),
+		EmpresaID: 1,
+	}); result.Error != nil {
 		fmt.Println("Error creating UsuarioEmpresa 1:", result.Error)
 		return false
 	}
@@ -137,135 +156,122 @@ func Seeders() bool {
 		RolID:           uint64(rolUsuario.ID),
 		FechaAsignacion: time.Now(),
 	}
-	if result := db.Create(&usuarioEmpresa2); result.Error != nil {
+	if result := db.FirstOrCreate(&usuarioEmpresa2, UsuarioEmpresa{
+		UsuarioID: uint64(usuario2.ID),
+		EmpresaID: 1,
+	}); result.Error != nil {
 		fmt.Println("Error creating UsuarioEmpresa 2:", result.Error)
 		return false
 	}
 
-	// Crear Sesiones
-	sesion1 := Sesion{
-		UsuarioID:       uint64(usuario1.ID),
-		Token:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
-		RefreshToken:    "refresh_token_1_example",
-		FechaExpiracion: time.Now().Add(24 * time.Hour),
-		Activa:          true,
-		IP:              "192.168.1.100",
-	}
-	if result := db.Create(&sesion1); result.Error != nil {
-		fmt.Println("Error creating Sesion 1:", result.Error)
-		return false
-	}
-
-	sesion2 := Sesion{
-		UsuarioID:       uint64(usuario2.ID),
-		Token:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5ODc2NTQzMjEwIiwibmFtZSI6Ik1hcmlhIExvcGV6IiwiaWF0IjoxNTE2MjM5MDIyfQ",
-		RefreshToken:    "refresh_token_2_example",
-		FechaExpiracion: time.Now().Add(24 * time.Hour),
-		Activa:          true,
-		IP:              "192.168.1.101",
-	}
-	if result := db.Create(&sesion2); result.Error != nil {
-		fmt.Println("Error creating Sesion 2:", result.Error)
-		return false
-	}
-
 	// Crear Módulos
-	modulo1 := Modulo{
-		Codigo: "DASHBOARD",
-		Nombre: "Dashboard",
-		Ruta:   "/dashboard",
-		Activo: true,
-		Orden:  1,
-	}
-	if result := db.Create(&modulo1); result.Error != nil {
-		fmt.Println("Error creating Modulo 1:", result.Error)
-		return false
+	modulos := []Modulo{
+		{Codigo: "DASHBOARD", Nombre: "Dashboard", Ruta: "/dashboard", Activo: true, Orden: 1},
+		{Codigo: "USERS", Nombre: "Usuarios", Ruta: "/users", Activo: true, Orden: 2},
+		{Codigo: "REPORTS", Nombre: "Reportes", Ruta: "/reports", Activo: true, Orden: 3},
+		{Codigo: "CONFIG", Nombre: "Configuración", Ruta: "/config", Activo: true, Orden: 4},
 	}
 
-	modulo2 := Modulo{
-		Codigo: "USERS",
-		Nombre: "Usuarios",
-		Ruta:   "/users",
-		Activo: true,
-		Orden:  2,
-	}
-	if result := db.Create(&modulo2); result.Error != nil {
-		fmt.Println("Error creating Modulo 2:", result.Error)
-		return false
-	}
-
-	modulo3 := Modulo{
-		Codigo: "REPORTS",
-		Nombre: "Reportes",
-		Ruta:   "/reports",
-		Activo: true,
-		Orden:  3,
-	}
-	if result := db.Create(&modulo3); result.Error != nil {
-		fmt.Println("Error creating Modulo 3:", result.Error)
-		return false
+	for i, m := range modulos {
+		if result := db.FirstOrCreate(&modulos[i], Modulo{Codigo: m.Codigo}); result.Error != nil {
+			fmt.Printf("Error creating Modulo %s: %v\n", m.Codigo, result.Error)
+			return false
+		}
 	}
 
 	// Crear RolModulos (permisos)
-	rolModulo1 := RolModulo{
-		RolID:    uint64(rolAdmin.ID),
-		ModuloID: uint64(modulo1.ID),
-		Acceso:   true,
-	}
-	if result := db.Create(&rolModulo1); result.Error != nil {
-		fmt.Println("Error creating RolModulo 1:", result.Error)
-		return false
-	}
-
-	rolModulo2 := RolModulo{
-		RolID:    uint64(rolAdmin.ID),
-		ModuloID: uint64(modulo2.ID),
-		Acceso:   true,
-	}
-	if result := db.Create(&rolModulo2); result.Error != nil {
-		fmt.Println("Error creating RolModulo 2:", result.Error)
-		return false
+	// Para rol Admin (tiene acceso a todos los módulos)
+	for _, modulo := range modulos {
+		rolModulo := RolModulo{
+			RolID:    uint64(rolAdmin.ID),
+			ModuloID: uint64(modulo.ID),
+			Acceso:   true,
+		}
+		if result := db.FirstOrCreate(&rolModulo, RolModulo{
+			RolID:    uint64(rolAdmin.ID),
+			ModuloID: uint64(modulo.ID),
+		}); result.Error != nil {
+			fmt.Printf("Error creating RolModulo for Admin-%s: %v\n", modulo.Codigo, result.Error)
+			return false
+		}
 	}
 
-	rolModulo3 := RolModulo{
-		RolID:    uint64(rolAdmin.ID),
-		ModuloID: uint64(modulo3.ID),
-		Acceso:   true,
-	}
-	if result := db.Create(&rolModulo3); result.Error != nil {
-		fmt.Println("Error creating RolModulo 3:", result.Error)
-		return false
+	// Para rol Usuario (solo acceso a Dashboard y Reportes)
+	userModulos := []string{"DASHBOARD", "REPORTS"}
+	for _, codigo := range userModulos {
+		var modulo Modulo
+		if result := db.Where("codigo = ?", codigo).First(&modulo); result.Error != nil {
+			fmt.Printf("Error finding Modulo %s: %v\n", codigo, result.Error)
+			return false
+		}
+
+		rolModulo := RolModulo{
+			RolID:    uint64(rolUsuario.ID),
+			ModuloID: uint64(modulo.ID),
+			Acceso:   true,
+		}
+		if result := db.FirstOrCreate(&rolModulo, RolModulo{
+			RolID:    uint64(rolUsuario.ID),
+			ModuloID: uint64(modulo.ID),
+		}); result.Error != nil {
+			fmt.Printf("Error creating RolModulo for User-%s: %v\n", modulo.Codigo, result.Error)
+			return false
+		}
 	}
 
-	rolModulo4 := RolModulo{
-		RolID:    uint64(rolUsuario.ID),
-		ModuloID: uint64(modulo1.ID),
-		Acceso:   true,
-	}
-	if result := db.Create(&rolModulo4); result.Error != nil {
-		fmt.Println("Error creating RolModulo 4:", result.Error)
-		return false
+	// Crear ejemplo de sesiones
+	ahora := time.Now()
+	sesiones := []Sesion{
+		{
+			UsuarioID:       uint64(usuario1.ID),
+			Token:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c3VhcmlvX2lkIjoxLCJwZXJzb25hX2lkIjoxfQ.ejemplo1",
+			RefreshToken:    "refresh_token_1",
+			FechaExpiracion: ahora.Add(24 * time.Hour),
+			Activa:          true,
+			IP:              "192.168.1.100",
+		},
+		{
+			UsuarioID:       uint64(usuario2.ID),
+			Token:           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c3VhcmlvX2lkIjoyLCJwZXJzb25hX2lkIjoyfQ.ejemplo2",
+			RefreshToken:    "refresh_token_2",
+			FechaExpiracion: ahora.Add(24 * time.Hour),
+			Activa:          false, // sesión inactiva
+			IP:              "192.168.1.101",
+		},
 	}
 
-	// Crear LoginAttempts
-	loginAttempt1 := LoginAttempt{
-		Identifier: "juan@example.com",
-		IP:         "192.168.1.100",
-		Success:    true,
-	}
-	if result := db.Create(&loginAttempt1); result.Error != nil {
-		fmt.Println("Error creating LoginAttempt 1:", result.Error)
-		return false
+	for _, sesion := range sesiones {
+		// No usamos FirstOrCreate aquí porque las sesiones son únicas y pueden repetirse
+		if result := db.Create(&sesion); result.Error != nil {
+			fmt.Printf("Error creating Sesion for Usuario %d: %v\n", sesion.UsuarioID, result.Error)
+			return false
+		}
 	}
 
-	loginAttempt2 := LoginAttempt{
-		Identifier: "unknown@example.com",
-		IP:         "192.168.1.200",
-		Success:    false,
+	// Crear ejemplos de intentos de login
+	attempts := []LoginAttempt{
+		{
+			Identifier: "12345678", // usando DNI
+			IP:         "192.168.1.100",
+			Success:    true,
+		},
+		{
+			Identifier: "invalid@example.com",
+			IP:         "192.168.1.200",
+			Success:    false,
+		},
+		{
+			Identifier: "41822932", // DNI de Fredy
+			IP:         "192.168.1.150",
+			Success:    true,
+		},
 	}
-	if result := db.Create(&loginAttempt2); result.Error != nil {
-		fmt.Println("Error creating LoginAttempt 2:", result.Error)
-		return false
+
+	for _, attempt := range attempts {
+		if result := db.Create(&attempt); result.Error != nil {
+			fmt.Printf("Error creating LoginAttempt for %s: %v\n", attempt.Identifier, result.Error)
+			return false
+		}
 	}
 
 	fmt.Println("Seed data inserted successfully!")

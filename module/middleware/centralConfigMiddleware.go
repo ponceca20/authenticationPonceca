@@ -10,7 +10,7 @@ import (
 
 // RouteMiddlewareMap defines middleware mappings for specific route prefixes
 var routeMiddlewareMap = map[string]fiber.Handler{
-	"/api/v1":    AuthMiddleware(),
+	"/api/v1":    AuthMiddleware(), //MiddlewareAdmin(),
 	"/api/admin": MiddlewareAdmin(),
 }
 

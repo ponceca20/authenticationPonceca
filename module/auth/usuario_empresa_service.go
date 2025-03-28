@@ -1,4 +1,4 @@
-package users
+package auth
 
 // UsuarioEmpresaService contiene la lógica de negocio para UsuarioEmpresa.
 type UsuarioEmpresaService struct {

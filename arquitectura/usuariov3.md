@@ -3,24 +3,35 @@ erDiagram
     %% Leyenda:
     %% PK: Primary key, FK: Foreign key
 
+    %% Tipos de Documento
+    TIPO_DOCUMENTO_SUNAT {
+        uint64 id PK "Identificador único"
+        timestamp created_at "Fecha de creación"
+        timestamp updated_at "Fecha de actualización"
+        timestamp deleted_at "Fecha de borrado"
+        string codigo "Código del tipo de documento"
+        string nombre "Nombre del tipo"
+    }
+
     %% Datos Personales
     PERSONA {
         uint64 id PK "Identificador único"
         timestamp created_at "Fecha de creación"
         timestamp updated_at "Fecha de actualización"
         timestamp deleted_at "Fecha de borrado"
-        string documento_tipo "Tipo: DNI, Cédula, etc."
+        uint64 tipo_documento_id FK "Referencia a TIPO_DOCUMENTO"
         string documento_numero "Número de documento"
         string foto "Foto"
         string nombre "Nombres"
         string apellidos "Apellidos"
         string email "Correo de contacto"
         string telefono "Número de contacto"
+        string telefono_secundario "Número de contacto secundario"
         string direccion "Dirección física"
-        string ciudad "Ciudad de residencia"
-        string pais "País de residencia"
         date fecha_nacimiento "Fecha de nacimiento"
     }
+
+
 
     %% USUARIO: cuenta para acceso al sistema
     USUARIO {
@@ -107,14 +118,11 @@ erDiagram
         bool success "Si el intento fue exitoso"
     }
 
-    %% Nota: LOGIN_ATTEMPT no tiene relaciones directas ya que registra todos los intentos 
-    %% de inicio de sesión, incluyendo aquellos con credenciales inválidas o usuarios que no existen.
-    %% Su propósito es detectar intentos de acceso no autorizados, ataques de fuerza bruta
-    %% y proporcionar información para auditorías de seguridad del sistema.
-
     %% Relaciones
+    TIPO_DOCUMENTO_SUNAT ||--o{ PERSONA : "clasifica"
     PERSONA ||--o{ USUARIO : "tiene"
     USUARIO ||--o{ SESION : "tiene"
+
     ROL ||--o{ ROL_MODULO : "asigna"
     MODULO ||--o{ ROL_MODULO : "autoriza"
     USUARIO ||--o{ USUARIO_EMPRESA : "tiene acceso a"

@@ -1,5 +1,5 @@
 // Cambio el nombre del paquete para que coincida con la carpeta del módulo.
-package users
+package auth
 
 import (
 	"log"
@@ -59,7 +59,7 @@ func getCompanyAccesses(usuarioID uint) []MinimalCompany {
 	var ueList []UsuarioEmpresa // ...existing struct definition...
 	if err := database.DBconn.
 		Select("empresa_id").
-		Where("usuario_id = ?", usuarioID).
+		Where("usuario_id = ? AND active_sesion = true", usuarioID). //
 		Find(&ueList).Error; err != nil {
 		return companies
 	}
@@ -166,6 +166,7 @@ func loginService(req LoginRequest, ip string) (fiber.Map, string, error) {
 	// Generar y firmar el token.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(getJWTKey())
+
 	if err != nil {
 		return nil, "", fiber.NewError(fiber.StatusInternalServerError, "Error generando token")
 	}
@@ -250,7 +251,8 @@ func loginHandler(c *fiber.Ctx) error {
 	// Add the token to the response for client-side storage options
 	// (useful as a fallback if cookies don't work)
 	response["token"] = token
-	//fmt.Println("JWT Key:", string(config.GetJWTKey()))
+	// Agregamos "isAuthenticated": true al response
+	response["isAuthenticated"] = true
 	return c.JSON(response)
 }
 
@@ -306,7 +308,7 @@ func statusHandler(c *fiber.Ctx) error {
 	}
 
 	// Validar el token
-	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.ParseWithClaims(tokenStr, &TokenClaims{}, func(t *jwt.Token) (interface{}, error) {
 		return getJWTKey(), nil
 	})
 
@@ -318,10 +320,24 @@ func statusHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	// Responder con status 200 e isAuthenticated: true
+	// Extraer claims del token
+	claims, ok := token.Claims.(*TokenClaims)
+	if !ok {
+		log.Printf("No se pudieron extraer claims del token")
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"isAuthenticated": false,
+		})
+	}
+
+	// Responder con status 200, isAuthenticated: true y la información del usuario y empresas
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
 		"isAuthenticated": true,
 		"timestamp":       time.Now().Format(time.RFC3339),
+		"user": fiber.Map{
+			"usuario_id": claims.UsuarioID,
+			"persona_id": claims.PersonaID,
+		},
+		"companies": claims.Companies,
 	})
 }
 
