@@ -52,8 +52,8 @@ func Seeders() bool {
 	// Crear Persona
 	persona1 := Persona{
 		TipoDocumentoID:    uint64(dni.ID),
-		DocumentoNumero:    "12345678",
-		Foto:               "foto1.jpg",
+		DocumentoNumero:    "41822933",
+		Foto:               "98",
 		Nombre:             "Juan",
 		Apellidos:          "Perez",
 		Email:              "juan@example.com",
@@ -70,7 +70,7 @@ func Seeders() bool {
 	persona2 := Persona{
 		TipoDocumentoID: uint64(dni.ID),
 		DocumentoNumero: "41822932",
-		Foto:            "foto2.jpg",
+		Foto:            "95",
 		Nombre:          "Fredy",
 		Apellidos:       "Ponceca",
 		Email:           "fredy@example.com",
@@ -84,8 +84,8 @@ func Seeders() bool {
 	}
 
 	// Generar password hashes
-	password1, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-	password2, _ := bcrypt.GenerateFromPassword([]byte("secret456"), bcrypt.DefaultCost)
+	password1, _ := bcrypt.GenerateFromPassword([]byte("123"), bcrypt.DefaultCost)
+	password2, _ := bcrypt.GenerateFromPassword([]byte("123"), bcrypt.DefaultCost)
 
 	// Crear Usuarios
 	usuario1 := Usuario{

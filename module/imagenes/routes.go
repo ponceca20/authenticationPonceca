@@ -44,7 +44,7 @@ func RegisterRoutes(app *fiber.App) {
 	// Protected routes
 	api.Post("/upload", middleware.AuthMiddleware(), handler.UploadImage)
 	api.Delete("/:id", middleware.AuthMiddleware(), handler.DeleteImage)
-	api.Put("/status", middleware.AuthMiddleware(), handler.UpdateImageStatus)
+	api.Post("/updatestatusimage", middleware.AuthMiddleware(), handler.UpdateImageStatus)
 }
 
 func init() {

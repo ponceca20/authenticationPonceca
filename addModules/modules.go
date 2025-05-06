@@ -8,5 +8,6 @@ import (
 	_ "practicev2/module/auth/rutascompuestas"
 	_ "practicev2/module/imagenes"
 	_ "practicev2/module/middleware"
+	_ "practicev2/module/product"
 	// Agregar nuevos módulos acá
 )

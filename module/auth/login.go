@@ -269,9 +269,22 @@ func logoutHandler(c *fiber.Ctx) error {
 	}
 
 	var sesion Sesion
-	if err := database.DBconn.Where("token = ? AND activa = ?", tokenStr, true).First(&sesion).Error; err != nil {
+	err := database.DBconn.Where("token = ? AND activa = ?", tokenStr, true).First(&sesion).Error
+	if err != nil {
 		log.Printf("Error obteniendo sesión para token %s: %v", tokenStr, err)
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Sesión no encontrada o ya inactiva"})
+		// Si la sesión no se encuentra, igual borra la cookie y responde éxito
+		c.Cookie(&fiber.Cookie{
+			Name:     cookieName,
+			Value:    "",
+			Path:     "/",
+			Domain:   "", // Siempre mismo sitio
+			Expires:  time.Now().Add(-24 * time.Hour),
+			MaxAge:   -1,
+			Secure:   config.IsProductionCookie(), // usar solo secure en producción
+			HTTPOnly: true,
+			SameSite: "Strict",
+		})
+		return c.JSON(fiber.Map{"message": "Sesión cerrada exitosamente"})
 	}
 
 	// Invalidar la sesión

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql_tpv:
     image: mysql:8.0
@@ -18,9 +16,14 @@ services:
       retries: 5
 
   redis_tpv:
-    image: redis:7.0
+    image: redislabs/redisearch:latest
     container_name: redis_tpv_cache
-    command: redis-server --requirepass Redis2024*
+    command:
+      - redis-server
+      - --requirepass
+      - "Redis2024*"
+      - --loadmodule
+      - /usr/lib/redis/modules/redisearch.so
     ports:
       - "6381:6379"
     volumes:
@@ -31,24 +34,6 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq_tpv:
-    image: rabbitmq:3.12-management
-    container_name: rabbitmq_tpv_broker
-    ports:
-      - "5674:5672"
-      - "15674:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq_tpv_data:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
 volumes:
   mysql_tpv_data:
   redis_tpv_data:
-  rabbitmq_tpv_data:
