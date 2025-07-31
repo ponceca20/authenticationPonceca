@@ -8,6 +8,7 @@ import (
 	"os"
 	"practicev2/addModules"
 	"practicev2/config"
+	_ "practicev2/module/authentication" // Import for side effects (init)
 	"practicev2/module/middleware"
 
 	"github.com/joho/godotenv"
