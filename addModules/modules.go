@@ -1,13 +1,18 @@
-// filepath: /c:/Users/ASUS/OneDrive/FREDY ponceca/carta ponceca/Documentos GRUPO PONCECA/PROYECTO 2025-1/febrero-practice-go/modules/modules.go
-package modules
+package addModules
 
 import (
-	// Los módulos se registran mediante sus funciones init.
+	//	"practicev2/module/authentication"
 
-	_ "practicev2/module/auth"
-	_ "practicev2/module/auth/rutascompuestas"
-	_ "practicev2/module/imagenes"
-	_ "practicev2/module/middleware"
-	_ "practicev2/module/product"
-	// Agregar nuevos módulos acá
+	"github.com/gofiber/fiber/v2"
 )
+
+// RegisterAllModules registra las rutas de todos los módulos
+func RegisterAllModules(app *fiber.App) {
+	// Registrar módulo de autenticación
+	// authentication.RegisterRoutes(app)
+
+	// TODO: Aquí se registrarán otros módulos cuando se implementen
+	// billing.RegisterRoutes(app)
+	// inventory.RegisterRoutes(app)
+	// notifications.RegisterRoutes(app)
+}

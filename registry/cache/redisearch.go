@@ -3,7 +3,6 @@ package cache
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/url"
 	"strconv"
 	"strings"
@@ -12,9 +11,6 @@ import (
 	"github.com/RediSearch/redisearch-go/redisearch"
 	"github.com/gomodule/redigo/redis"
 )
-
-// ProductIndexName es el nombre del índice de productos en RediSearch
-const ProductIndexName = "idx:producto"
 
 // RediSearchClient define las operaciones de búsqueda sobre RediSearch
 type RediSearchClient interface {
@@ -26,12 +22,13 @@ type RediSearchClient interface {
 
 type clientImpl struct {
 	client      *redisearch.Client
-	pool        *redis.Pool // add pool for direct connections
-	isAvailable bool        // Track if RediSearch is available
+	pool        *redis.Pool
+	isAvailable bool
+	indexName   string
 }
 
-// NewRediSearchClient crea un cliente de RediSearch a partir de la URL
-func NewRediSearchClient(redisURL string) (RediSearchClient, error) {
+// NewRediSearchClient crea un cliente de RediSearch a partir de la URL y el nombre del índice
+func NewRediSearchClient(redisURL string, indexName string) (RediSearchClient, error) {
 	parsedURL, err := url.Parse(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("error al parsear URL de Redis: %w", err)
@@ -77,14 +74,14 @@ func NewRediSearchClient(redisURL string) (RediSearchClient, error) {
 		MaxActive:   100,
 	}
 
-	client := redisearch.NewClientFromPool(pool, ProductIndexName)
+	client := redisearch.NewClientFromPool(pool, indexName)
 	impl := &clientImpl{
 		client:      client,
-		pool:        pool, // store pool
+		pool:        pool,
 		isAvailable: false,
+		indexName:   indexName,
 	}
 
-	// Test if RediSearch is available
 	if err := impl.testRediSearch(); err != nil {
 		return nil, fmt.Errorf("RediSearch not available: %w", err)
 	}
@@ -96,7 +93,6 @@ func (c *clientImpl) testRediSearch() error {
 	conn := c.pool.Get()
 	defer conn.Close()
 
-	// 1) Intentar detectar módulo vía MODULE LIST
 	modules, err := redis.Values(conn.Do("MODULE", "LIST"))
 	if err == nil {
 		for _, m := range modules {
@@ -113,41 +109,35 @@ func (c *clientImpl) testRediSearch() error {
 		return fmt.Errorf("RediSearch module not found in MODULE LIST")
 	}
 
-	// 2) Fallback: sonda con FT.SEARCH en índice inexistente
 	_, err = conn.Do("FT.SEARCH", "redisearch_test", "*", "LIMIT", 0, 0)
 	if err != nil {
 		msg := err.Error()
 		if strings.HasPrefix(msg, "ERR unknown command") {
 			return fmt.Errorf("RediSearch module not loaded")
 		}
-		// cualquier otro error indica que el módulo está presente
 	}
 	return nil
 }
 
 func (c *clientImpl) CreateIndex(ctx context.Context, name string, schema map[string]string) error {
 	if !c.isAvailable {
-		log.Printf("WARNING: Skipping index creation - RediSearch not available")
-		return nil // Skip index creation if RediSearch isn't available
+		return nil
 	}
 
-	// 1) chequeo explícito de existencia
 	conn := c.pool.Get()
 	defer conn.Close()
 	if _, err := conn.Do("FT.INFO", name); err != nil {
-		if strings.HasPrefix(err.Error(), "ERR unknown index name") {
-			// índice no existe → no hay nada que dropear
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "unknown index name") || strings.Contains(errMsg, "Unknown Index name") {
 		} else {
 			return fmt.Errorf("error checking index existence: %w", err)
 		}
 	} else {
-		// 2) índice existe → dropear y propagar fallo si lo hay
 		if err := c.client.DropIndex(true); err != nil {
 			return fmt.Errorf("failed to drop existing index: %w", err)
 		}
 	}
 
-	// Create schema
 	sc := redisearch.NewSchema(redisearch.DefaultOptions)
 
 	for field, typ := range schema {
@@ -163,7 +153,6 @@ func (c *clientImpl) CreateIndex(ctx context.Context, name string, schema map[st
 		}
 	}
 
-	// Try to create index but handle case where RediSearch is not available
 	if err := c.client.CreateIndex(sc); err != nil {
 		return fmt.Errorf("failed to create index: %w", err)
 	}
@@ -171,9 +160,8 @@ func (c *clientImpl) CreateIndex(ctx context.Context, name string, schema map[st
 	return nil
 }
 
-func (c *clientImpl) AddDocument(ctx context.Context, _index, id string, fields map[string]interface{}) error {
+func (c *clientImpl) AddDocument(ctx context.Context, index, id string, fields map[string]interface{}) error {
 	if !c.isAvailable {
-		log.Printf("WARNING: Skipping AddDocument - RediSearch not available")
 		return nil
 	}
 	doc := redisearch.NewDocument(id, 1.0)
@@ -183,9 +171,8 @@ func (c *clientImpl) AddDocument(ctx context.Context, _index, id string, fields 
 	return c.client.IndexOptions(redisearch.IndexingOptions{Replace: true}, doc)
 }
 
-func (c *clientImpl) Search(ctx context.Context, _index, query string, offset, limit int) ([]map[string]string, int64, error) {
+func (c *clientImpl) Search(ctx context.Context, index, query string, offset, limit int) ([]map[string]string, int64, error) {
 	if !c.isAvailable {
-		log.Printf("WARNING: Skipping Search - RediSearch not available")
 		return nil, 0, nil
 	}
 	q := redisearch.NewQuery(query).Limit(offset, limit)
@@ -204,9 +191,8 @@ func (c *clientImpl) Search(ctx context.Context, _index, query string, offset, l
 	return results, int64(total), nil
 }
 
-func (c *clientImpl) DeleteDocument(ctx context.Context, _index, id string) error {
+func (c *clientImpl) DeleteDocument(ctx context.Context, index, id string) error {
 	if !c.isAvailable {
-		log.Printf("WARNING: Skipping DeleteDocument - RediSearch not available")
 		return nil
 	}
 	return c.client.Delete(id, true)

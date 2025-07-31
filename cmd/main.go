@@ -6,7 +6,7 @@ import (
 	//modulos importados
 
 	"os"
-	_ "practicev2/addModules"
+	"practicev2/addModules"
 	"practicev2/config"
 	"practicev2/module/middleware"
 
@@ -45,7 +45,7 @@ func main() {
 	app.Use(middleware.ConfigMiddleware())
 
 	app.Get("/", func(c *fiber.Ctx) error { return c.SendString("Bienvenido") })
-	registry.RegisterAllModules(app)
+	addModules.RegisterAllModules(app)
 
 	//Usar la dirección del servidor desde el paquete config
 	addr := os.Getenv("APP_HOST") + ":" + os.Getenv("APP_PORT")
