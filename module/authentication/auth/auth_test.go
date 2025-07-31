@@ -1,12 +1,16 @@
 package auth
 
 import (
-	"practicev2/module/authentication/test"
+	"fmt"
+	"practicev2/config"
+	"practicev2/module/authentication/models"
 	"practicev2/module/authentication/utils"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -18,12 +22,59 @@ type AuthTestSuite struct {
 	jwtService *utils.JWTService
 }
 
+// setupTestDatabase initializes an in-memory SQLite database for testing purposes.
+func (suite *AuthTestSuite) setupTestDatabase() *gorm.DB {
+	// Initialize config with default values for tests
+	config.Init()
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		suite.T().Fatalf("Failed to connect to in-memory database: %v", err)
+	}
+
+	// Auto-migrate the models we need for testing
+	err = db.AutoMigrate(
+		&models.Identity{},
+		&models.User{},
+		&models.UserProfile{},
+		&models.Organization{},
+		&models.OrganizationalMembership{},
+		&models.CustomerProfile{},
+		&models.RefreshToken{},
+		&models.PasswordResetToken{},
+	)
+	if err != nil {
+		suite.T().Fatalf("Failed to run migrations: %v", err)
+	}
+
+	return db
+}
+
 // SetupSuite runs once before the entire test suite
 func (suite *AuthTestSuite) SetupSuite() {
-	suite.db = test.SetupTestDatabase(suite.T())
+	suite.db = suite.setupTestDatabase()
 	suite.repo = NewAuthRepository(suite.db)
 	suite.jwtService = utils.NewJWTService()
 	suite.service = NewAuthService(suite.repo, suite.jwtService)
+}
+
+// SetupTest runs before each individual test to ensure clean state
+func (suite *AuthTestSuite) SetupTest() {
+	// Clean all test data to ensure complete isolation (only existing tables)
+	suite.db.Exec("DELETE FROM refresh_token")
+	suite.db.Exec("DELETE FROM password_reset_token")
+	suite.db.Exec("DELETE FROM customer_profile")
+	suite.db.Exec("DELETE FROM organizational_membership")
+	suite.db.Exec("DELETE FROM identity")
+
+	// Small sleep to ensure different timestamps between tests
+	time.Sleep(5 * time.Millisecond)
+}
+
+// generateUniqueEmail creates a unique email for each test to avoid conflicts
+func (suite *AuthTestSuite) generateUniqueEmail(prefix string) string {
+	// Use crypto/rand for better randomness in tests
+	return fmt.Sprintf("%s.%d@example.com", prefix, time.Now().UnixNano()%100000)
 }
 
 func TestAuthTestSuite(t *testing.T) {
@@ -35,7 +86,7 @@ func (suite *AuthTestSuite) TestRegisterAndLogin() {
 	registerDTO := &RegisterDTO{
 		FirstName: "John",
 		LastName:  "Doe",
-		Email:     "john.doe@example.com",
+		Email:     suite.generateUniqueEmail("john.doe"),
 		Password:  "strong-password-123",
 	}
 
@@ -52,7 +103,7 @@ func (suite *AuthTestSuite) TestRegisterAndLogin() {
 
 	// 3. Login with correct credentials
 	loginDTO := &LoginDTO{
-		Email:    "john.doe@example.com",
+		Email:    registerDTO.Email,
 		Password: "strong-password-123",
 	}
 
@@ -85,7 +136,7 @@ func (suite *AuthTestSuite) TestRefreshToken() {
 	registerDTO := &RegisterDTO{
 		FirstName: "Jane",
 		LastName:  "Doe",
-		Email:     "jane.doe@example.com",
+		Email:     suite.generateUniqueEmail("jane.doe"),
 		Password:  "a-different-password",
 	}
 	_, err := suite.service.Register(registerDTO)
@@ -95,6 +146,9 @@ func (suite *AuthTestSuite) TestRefreshToken() {
 	loginResponse, err := suite.service.Login(loginDTO)
 	assert.NoError(suite.T(), err)
 	assert.NotEmpty(suite.T(), loginResponse.RefreshToken)
+
+	// Significant delay to ensure different timestamp for refresh token generation
+	time.Sleep(50 * time.Millisecond)
 
 	// 2. Use the refresh token to get a new access token
 	refreshDTO := &RefreshTokenDTO{RefreshToken: loginResponse.RefreshToken}
@@ -114,7 +168,7 @@ func (suite *AuthTestSuite) TestLogout() {
 	registerDTO := &RegisterDTO{
 		FirstName: "Logout",
 		LastName:  "User",
-		Email:     "logout.user@example.com",
+		Email:     suite.generateUniqueEmail("logout.user"),
 		Password:  "password-to-logout",
 	}
 	_, err := suite.service.Register(registerDTO)
@@ -122,6 +176,9 @@ func (suite *AuthTestSuite) TestLogout() {
 	loginDTO := &LoginDTO{Email: registerDTO.Email, Password: registerDTO.Password}
 	loginResponse, err := suite.service.Login(loginDTO)
 	assert.NoError(suite.T(), err)
+
+	// Significant delay to ensure different timestamp
+	time.Sleep(50 * time.Millisecond)
 
 	// 2. Logout using the refresh token
 	logoutDTO := &RefreshTokenDTO{RefreshToken: loginResponse.RefreshToken}

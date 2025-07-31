@@ -6,12 +6,12 @@ import "time"
 // It holds the core credentials and personal information.
 type Identity struct {
 	ID                  string     `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	Email               string     `json:"email" gorm:"uniqueIndex;size:191"`
-	PasswordHash        string     `json:"-" gorm:"column:password_hash"`
+	Email               string     `json:"email" gorm:"uniqueIndex;size:191;not null"`
+	PasswordHash        string     `json:"-" gorm:"column:password_hash;not null"`
 	EmailVerified       bool       `json:"email_verified" gorm:"default:false"`
 	EmailVerifiedAt     *time.Time `json:"email_verified_at,omitempty"`
-	FirstName           string     `json:"first_name"`
-	LastName            string     `json:"last_name"`
+	FirstName           string     `json:"first_name" gorm:"not null"`
+	LastName            string     `json:"last_name" gorm:"not null"`
 	Avatar              string     `json:"avatar,omitempty"`
 	Phone               string     `json:"phone,omitempty"`
 	DateOfBirth         *time.Time `json:"date_of_birth,omitempty"`

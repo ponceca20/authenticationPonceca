@@ -2,15 +2,16 @@ package middleware
 
 import (
 	"net/http"
+	"practicev2/config"
 	"practicev2/database"
 	"practicev2/module/authentication/auth"
 	"practicev2/module/authentication/models"
-	"practicev2/module/authentication/test"
 	"practicev2/module/authentication/utils"
 	"testing"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -21,9 +22,33 @@ func setupAppWithMiddleware(db *gorm.DB) *fiber.App {
 	return app
 }
 
+// setupTestDatabase initializes an in-memory SQLite database for testing purposes.
+func setupTestDatabase(t *testing.T) *gorm.DB {
+	// Initialize config with default values for tests
+	config.Init()
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("Failed to connect to in-memory database: %v", err)
+	}
+
+	// Auto-migrate the models we need for testing
+	err = db.AutoMigrate(
+		&models.Identity{},
+		&models.User{},
+		&models.UserProfile{},
+		&models.RefreshToken{},
+	)
+	if err != nil {
+		t.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	return db
+}
+
 func TestSmartAuthMiddleware(t *testing.T) {
 	// Setup Test DB and a test user
-	db := test.SetupTestDatabase(t)
+	db := setupTestDatabase(t)
 	authRepo := auth.NewAuthRepository(db)
 	jwtService := utils.NewJWTService()
 	authService := auth.NewAuthService(authRepo, jwtService)

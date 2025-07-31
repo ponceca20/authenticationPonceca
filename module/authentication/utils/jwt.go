@@ -28,11 +28,11 @@ type GuestClaim struct {
 // UnifiedClaims represents the custom claims for the JWT.
 // It contains the core identity and all possible contexts (memberships, customer, guest).
 type UnifiedClaims struct {
-	IdentityID   string            `json:"identity_id"`
-	Email        string            `json:"email"`
-	Memberships  []MembershipClaim `json:"memberships,omitempty"`
-	Customer     *CustomerClaim    `json:"customer,omitempty"`
-	Guest        *GuestClaim       `json:"guest,omitempty"`
+	IdentityID  string            `json:"identity_id"`
+	Email       string            `json:"email"`
+	Memberships []MembershipClaim `json:"memberships,omitempty"`
+	Customer    *CustomerClaim    `json:"customer,omitempty"`
+	Guest       *GuestClaim       `json:"guest,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -68,14 +68,17 @@ func (s *JWTService) GetRefreshTTL() time.Duration {
 
 // GenerateTokenPair generates both an access and a refresh token for a given identity and contexts.
 func (s *JWTService) GenerateTokenPair(identity *models.Identity, memberships []models.OrganizationalMembership, customer *models.CustomerProfile) (string, string, error) {
-	// Generate claims
+	baseTime := time.Now()
+
+	// Generate claims for access token
 	claims := &UnifiedClaims{
 		IdentityID: identity.ID,
 		Email:      identity.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.accessTTL)),
+			ExpiresAt: jwt.NewNumericDate(baseTime.Add(s.accessTTL)),
 			Issuer:    s.issuer,
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			IssuedAt:  jwt.NewNumericDate(baseTime),
+			ID:        fmt.Sprintf("%s-access-%d", identity.ID, baseTime.UnixNano()), // Unique JTI for access token
 		},
 	}
 
@@ -97,13 +100,16 @@ func (s *JWTService) GenerateTokenPair(identity *models.Identity, memberships []
 		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
-	// Generate refresh token
+	// Generate refresh token with unique timestamp and additional randomness
+	refreshTime := baseTime.Add(time.Duration(baseTime.UnixNano()%1000) * time.Microsecond) // Add microsecond variation
 	refreshClaims := &UnifiedClaims{
 		IdentityID: identity.ID,
+		Email:      identity.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.refreshTTL)),
-			Issuer:    s.issuer,
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(refreshTime.Add(s.refreshTTL)),
+			Issuer:    s.issuer + "-refresh", // Different issuer for refresh tokens
+			IssuedAt:  jwt.NewNumericDate(refreshTime),
+			ID:        fmt.Sprintf("%s-%d", identity.ID, refreshTime.UnixNano()), // Unique JTI for each token
 		},
 	}
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)

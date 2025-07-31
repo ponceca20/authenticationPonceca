@@ -1,36 +1,70 @@
 package customer
 
 import (
+	"fmt"
+	"math/rand"
+	"practicev2/config"
 	"practicev2/module/authentication/auth"
 	"practicev2/module/authentication/models"
-	"practicev2/module/authentication/test"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 type CustomerTestSuite struct {
 	suite.Suite
-	db             *gorm.DB
-	customerRepo   CustomerRepository
-	authRepo       auth.AuthRepository
+	db              *gorm.DB
+	customerRepo    CustomerRepository
+	authRepo        auth.AuthRepository
 	customerService CustomerService
-	testIdentity   *models.Identity
+	testIdentity    *models.Identity
+}
+
+// setupTestDatabase initializes an in-memory SQLite database for testing purposes.
+func (suite *CustomerTestSuite) setupTestDatabase() *gorm.DB {
+	// Initialize config with default values for tests
+	config.Init()
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		suite.T().Fatalf("Failed to connect to in-memory database: %v", err)
+	}
+
+	// Auto-migrate the models we need for testing
+	err = db.AutoMigrate(
+		&models.Identity{},
+		&models.User{},
+		&models.UserProfile{},
+		&models.CustomerProfile{},
+		&models.CustomerPreferences{},
+		&models.ShippingAddress{},
+		&models.RefreshToken{},
+	)
+	if err != nil {
+		suite.T().Fatalf("Failed to run migrations: %v", err)
+	}
+
+	return db
 }
 
 func (suite *CustomerTestSuite) SetupSuite() {
-	suite.db = test.SetupTestDatabase(suite.T())
+	suite.db = suite.setupTestDatabase()
 	suite.customerRepo = NewCustomerRepository(suite.db)
 	suite.authRepo = auth.NewAuthRepository(suite.db)
 	suite.customerService = NewCustomerService(suite.customerRepo, suite.authRepo)
 
-	// Create a test customer
+	// Create a test customer with unique email
+	rand.Seed(time.Now().UnixNano())
+	uniqueEmail := fmt.Sprintf("customer.test.%d@example.com", rand.Intn(100000))
+
 	dto := &CustomerRegistrationDTO{
 		FirstName: "Customer",
 		LastName:  "Test",
-		Email:     "customer.test@example.com",
+		Email:     uniqueEmail,
 		Password:  "password123",
 	}
 	profile, err := suite.customerService.RegisterCustomer(dto)
@@ -87,8 +121,8 @@ func (suite *CustomerTestSuite) TestPreferencesManagement() {
 
 	// 2. Update preferences
 	updateDTO := &PreferencesDTO{
-		Theme:            "dark",
-		Language:         "en",
+		Theme:              "dark",
+		Language:           "en",
 		EmailNotifications: false,
 	}
 	updatedPrefs, err := suite.customerService.UpdatePreferences(suite.testIdentity.ID, updateDTO)

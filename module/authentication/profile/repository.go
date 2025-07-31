@@ -3,6 +3,7 @@ package profile
 import (
 	"practicev2/module/authentication/models"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -39,9 +40,24 @@ func (r *profileRepository) UpdateIdentity(identity *models.Identity) error {
 
 // FindOrCreateUserProfile finds a user profile by identity ID or creates it if it doesn't exist.
 func (r *profileRepository) FindOrCreateUserProfile(profile *models.UserProfile) error {
-	// FirstOrCreate finds the first record that matches given conditions,
-	// or create a new one with the given conditions if none found.
-	return r.db.Where(models.UserProfile{IdentityID: profile.IdentityID}).FirstOrCreate(profile).Error
+	// First try to find existing profile
+	err := r.db.Where("identity_id = ?", profile.IdentityID).First(profile).Error
+	if err == nil {
+		// Profile found, return it
+		return nil
+	}
+
+	// If not found, create a new one
+	if err == gorm.ErrRecordNotFound {
+		// Generate ID if not set
+		if profile.ID == "" {
+			profile.ID = uuid.New().String()
+		}
+		return r.db.Create(profile).Error
+	}
+
+	// Return any other error
+	return err
 }
 
 // UpdateUserProfile saves changes to a UserProfile model.

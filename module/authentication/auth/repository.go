@@ -2,6 +2,7 @@ package auth
 
 import (
 	"practicev2/module/authentication/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -90,7 +91,7 @@ func (r *authRepository) SaveRefreshToken(token *models.RefreshToken) error {
 func (r *authRepository) FindRefreshToken(tokenValue string) (*models.RefreshToken, error) {
 	var token models.RefreshToken
 	// Also preload the Identity to avoid another DB call
-	err := r.db.Preload("Identity").Where("token = ? AND is_revoked = false AND expires_at > NOW()", tokenValue).First(&token).Error
+	err := r.db.Preload("Identity").Where("token = ? AND is_revoked = false AND expires_at > ?", tokenValue, time.Now()).First(&token).Error
 	return &token, err
 }
 
@@ -115,7 +116,7 @@ func (r *authRepository) CreatePasswordResetToken(token *models.PasswordResetTok
 // FindPasswordResetToken finds a password reset token by its value.
 func (r *authRepository) FindPasswordResetToken(tokenValue string) (*models.PasswordResetToken, error) {
 	var token models.PasswordResetToken
-	err := r.db.Where("token = ? AND expires_at > NOW()", tokenValue).First(&token).Error
+	err := r.db.Where("token = ? AND expires_at > ?", tokenValue, time.Now()).First(&token).Error
 	return &token, err
 }
 

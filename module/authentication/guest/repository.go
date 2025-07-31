@@ -2,6 +2,7 @@ package guest
 
 import (
 	"practicev2/module/authentication/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -31,7 +32,7 @@ func (r *guestRepository) CreateSession(session *models.GuestSession) error {
 // FindSessionByToken finds a guest session by its unique session token.
 func (r *guestRepository) FindSessionByToken(token string) (*models.GuestSession, error) {
 	var session models.GuestSession
-	if err := r.db.Where("session_token = ? AND expires_at > NOW()", token).First(&session).Error; err != nil {
+	if err := r.db.Where("session_token = ? AND expires_at > ?", token, time.Now()).First(&session).Error; err != nil {
 		return nil, err
 	}
 	return &session, nil

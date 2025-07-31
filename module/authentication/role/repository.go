@@ -90,11 +90,23 @@ func (r *roleRepository) FindOrCreatePermissions(permissionsToFind []*models.Per
 	var foundPermissions []*models.Permission
 	for _, p := range permissionsToFind {
 		var found models.Permission
-		// Use FirstOrCreate with the unique composite key fields
-		if err := r.db.Where("resource = ? AND action = ? AND scope = ?", p.Resource, p.Action, p.Scope).FirstOrCreate(&found).Error; err != nil {
-			return nil, err
+		// First try to find existing permission
+		err := r.db.Where("resource = ? AND action = ? AND scope = ?", p.Resource, p.Action, p.Scope).First(&found).Error
+		if err == nil {
+			// Found existing permission
+			foundPermissions = append(foundPermissions, &found)
+		} else {
+			// Create new permission (ID will be auto-generated)
+			newPerm := &models.Permission{
+				Resource: p.Resource,
+				Action:   p.Action,
+				Scope:    p.Scope,
+			}
+			if err := r.db.Create(newPerm).Error; err != nil {
+				return nil, err
+			}
+			foundPermissions = append(foundPermissions, newPerm)
 		}
-		foundPermissions = append(foundPermissions, &found)
 	}
 	return foundPermissions, nil
 }

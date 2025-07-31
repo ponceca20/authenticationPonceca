@@ -1,29 +1,57 @@
 package user
 
 import (
+	"practicev2/config"
 	"practicev2/module/authentication/auth"
 	"practicev2/module/authentication/models"
 	"practicev2/module/authentication/organization"
-	"practicev2/module/authentication/test"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 type UserTestSuite struct {
 	suite.Suite
-	db             *gorm.DB
-	userRepo       UserRepository
-	userService    UserService
-	orgService     organization.OrganizationService
-	testOrg        *models.Organization
-	testUser       *models.Identity
+	db          *gorm.DB
+	userRepo    UserRepository
+	userService UserService
+	orgService  organization.OrganizationService
+	testOrg     *models.Organization
+	testUser    *models.Identity
+}
+
+// setupTestDatabase initializes an in-memory SQLite database for testing purposes.
+func (suite *UserTestSuite) setupTestDatabase() *gorm.DB {
+	// Initialize config with default values for tests
+	config.Init()
+
+	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		suite.T().Fatalf("Failed to connect to in-memory database: %v", err)
+	}
+
+	// Auto-migrate the models we need for testing
+	err = db.AutoMigrate(
+		&models.Identity{},
+		&models.User{},
+		&models.UserProfile{},
+		&models.Organization{},
+		&models.OrganizationalMembership{},
+		&models.Role{},
+		&models.RefreshToken{},
+	)
+	if err != nil {
+		suite.T().Fatalf("Failed to run migrations: %v", err)
+	}
+
+	return db
 }
 
 func (suite *UserTestSuite) SetupSuite() {
-	suite.db = test.SetupTestDatabase(suite.T())
+	suite.db = suite.setupTestDatabase()
 	suite.userRepo = NewUserRepository(suite.db)
 	suite.userService = NewUserService(suite.userRepo)
 

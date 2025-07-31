@@ -2,6 +2,7 @@ package invitation
 
 import (
 	"practicev2/module/authentication/models"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -37,7 +38,7 @@ func (r *invitationRepository) FindInvitationByToken(token string) (*models.Invi
 	err := r.db.
 		Preload("Organization").
 		Preload("Role").
-		Where("token = ? AND status = 'pending' AND expires_at > NOW()", token).
+		Where("token = ? AND status = 'pending' AND expires_at > ?", token, time.Now()).
 		First(&invitation).Error
 	return &invitation, err
 }

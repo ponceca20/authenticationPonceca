@@ -3,6 +3,7 @@ package customer
 import (
 	"practicev2/module/authentication/models"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -88,7 +89,21 @@ func (r *customerRepository) DeleteAddress(addressID string) error {
 
 // FindOrCreatePreferences finds customer preferences or creates them if they don't exist.
 func (r *customerRepository) FindOrCreatePreferences(prefs *models.CustomerPreferences) error {
-	return r.db.Where(models.CustomerPreferences{CustomerProfileID: prefs.CustomerProfileID}).FirstOrCreate(prefs).Error
+	// First try to find existing preferences
+	existing := &models.CustomerPreferences{}
+	err := r.db.Where("customer_profile_id = ?", prefs.CustomerProfileID).First(existing).Error
+	if err == nil {
+		// Found existing preferences, copy them to the input struct
+		*prefs = *existing
+		return nil
+	}
+
+	// If not found, create new preferences with a generated ID
+	if prefs.ID == "" {
+		prefs.ID = uuid.New().String()
+	}
+
+	return r.db.Create(prefs).Error
 }
 
 // UpdatePreferences saves changes to customer preferences.
