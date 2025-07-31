@@ -13,11 +13,11 @@ type OrganizationalMembership struct {
 	Role           Role         `json:"role" gorm:"foreignKey:RoleID"`
 
 	// Context-specific data
-	Department string `json:"department,omitempty"`               // For employees
-	Grade      string `json:"grade,omitempty"`                    // For students
-	Subject    string `json:"subject,omitempty"`                  // For teachers
-	StudentID  string `json:"student_id,omitempty" gorm:"index"`  // Unique student ID
-	EmployeeID string `json:"employee_id,omitempty" gorm:"index"` // Unique employee ID
+	Department string `json:"department,omitempty" gorm:"size:255"`        // For employees
+	Grade      string `json:"grade,omitempty" gorm:"size:50"`              // For students
+	Subject    string `json:"subject,omitempty" gorm:"size:255"`           // For teachers
+	StudentID  string `json:"student_id,omitempty" gorm:"index;size:100"`  // Unique student ID
+	EmployeeID string `json:"employee_id,omitempty" gorm:"index;size:100"` // Unique employee ID
 
 	// Temporal control
 	ActiveFrom  time.Time  `json:"active_from" gorm:"not null"`

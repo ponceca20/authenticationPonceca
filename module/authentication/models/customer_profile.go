@@ -11,9 +11,9 @@ type CustomerProfile struct {
 	// E-commerce specific data
 	CustomerNumber         string  `json:"customer_number" gorm:"uniqueIndex;size:191;not null"`
 	PreferredPaymentMethod string  `json:"preferred_payment_method,omitempty" gorm:"size:100"`
-	CreditLimit            float64 `json:"credit_limit" gorm:"default:0"`
-	TotalSpent             float64 `json:"total_spent" gorm:"default:0"`
-	LoyaltyPoints          int     `json:"loyalty_points" gorm:"default:0"`
+	CreditLimit            float64 `json:"credit_limit" gorm:"default:0;type:decimal(15,2)"`
+	TotalSpent             float64 `json:"total_spent" gorm:"default:0;type:decimal(15,2)"`
+	LoyaltyPoints          int     `json:"loyalty_points" gorm:"default:0;type:int"`
 
 	// Marketing preferences
 	AcceptsMarketing  bool   `json:"accepts_marketing" gorm:"default:false"`

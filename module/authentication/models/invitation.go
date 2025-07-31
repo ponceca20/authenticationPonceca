@@ -12,7 +12,7 @@ type Invitation struct {
 	Email          string       `json:"email" gorm:"not null;size:191"`
 	RoleID         string       `json:"role_id" gorm:"index;type:varchar(36);not null"`
 	Role           Role         `json:"role" gorm:"foreignKey:RoleID"`
-	Token          string       `json:"-" gorm:"uniqueIndex;size:191;not null"`
+	Token          string       `json:"-" gorm:"uniqueIndex;size:512;not null"`
 	Status         string       `json:"status" gorm:"default:'pending';size:50"` // e.g., pending, accepted, expired
 	ExpiresAt      time.Time    `json:"expires_at" gorm:"not null"`
 	CreatedAt      time.Time    `json:"created_at"`

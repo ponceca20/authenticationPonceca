@@ -10,10 +10,10 @@ type AuditLog struct {
 	Identity       Identity  `json:"identity" gorm:"foreignKey:IdentityID"`
 	Action         string    `json:"action" gorm:"not null;size:255;index"` // e.g., "user.login", "organization.create"
 	Resource       string    `json:"resource" gorm:"size:100;index"`        // e.g., "organization"
-	ResourceID     string    `json:"resource_id" gorm:"index"`              // e.g., the ID of the created organization
+	ResourceID     string    `json:"resource_id" gorm:"index;size:100"`     // e.g., the ID of the created organization
 	Status         string    `json:"status" gorm:"size:50"`                 // e.g., "success", "failure"
 	IPAddress      string    `json:"ip_address,omitempty" gorm:"size:45"`
-	UserAgent      string    `json:"user_agent,omitempty" gorm:"type:text"`
-	Details        string    `json:"details,omitempty" gorm:"type:text"`
+	UserAgent      string    `json:"user_agent,omitempty" gorm:"size:1000"`
+	Details        string    `json:"details,omitempty" gorm:"type:json"`
 	Timestamp      time.Time `json:"timestamp" gorm:"not null;index"`
 }

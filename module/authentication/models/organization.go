@@ -8,11 +8,11 @@ type Organization struct {
 	Name        string     `json:"name" gorm:"not null;size:255"`
 	Slug        string     `json:"slug" gorm:"uniqueIndex;size:191;not null"`
 	Type        string     `json:"type" gorm:"not null;size:100"` // e.g., "company", "educational_institution"
-	Description string     `json:"description" gorm:"type:text"`
-	Avatar      string     `json:"avatar,omitempty"`
-	Website     string     `json:"website,omitempty"`
-	Phone       string     `json:"phone,omitempty"`
-	Address     string     `json:"address,omitempty" gorm:"type:text"`
+	Description string     `json:"description" gorm:"size:1000"`
+	Avatar      string     `json:"avatar,omitempty" gorm:"size:500"`
+	Website     string     `json:"website,omitempty" gorm:"size:255"`
+	Phone       string     `json:"phone,omitempty" gorm:"size:20"`
+	Address     string     `json:"address,omitempty" gorm:"size:500"`
 	IsActive    bool       `json:"is_active" gorm:"default:true"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`

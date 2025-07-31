@@ -9,8 +9,8 @@ type Role struct {
 	Organization   Organization `json:"organization" gorm:"foreignKey:OrganizationID"`
 	Name           string       `json:"name" gorm:"not null;size:100;uniqueIndex:idx_org_role_name"`
 	DisplayName    string       `json:"display_name" gorm:"size:255"`
-	Description    string       `json:"description" gorm:"type:text"`
-	HierarchyLevel int          `json:"hierarchy_level" gorm:"default:0"`
+	Description    string       `json:"description" gorm:"size:500"`
+	HierarchyLevel int          `json:"hierarchy_level" gorm:"default:0;type:smallint"`
 	IsSystemRole   bool         `json:"is_system_role" gorm:"default:false"`
 	Permissions    []Permission `json:"permissions" gorm:"many2many:role_permission;"`
 	CreatedAt      time.Time    `json:"created_at"`
