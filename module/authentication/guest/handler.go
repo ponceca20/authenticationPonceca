@@ -57,7 +57,12 @@ func (h *GuestHandler) GetSession(c *fiber.Ctx) error {
 	dto := GuestSessionDTO{
 		SessionToken: session.SessionToken,
 		ExpiresAt:    session.ExpiresAt,
-		CartData:     session.CartData,
+		CartData:     "",
+	}
+
+	// Handle potential nil CartData
+	if session.CartData != nil {
+		dto.CartData = *session.CartData
 	}
 
 	return utils.SendSuccess(c, fiber.StatusOK, dto)

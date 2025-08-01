@@ -24,15 +24,24 @@ func (h *CustomerHandler) Register(c *fiber.Ctx) error {
 		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
 	}
 
-	// The service handles more detailed validation.
-	_, err := h.service.RegisterCustomer(&dto)
+	// El servicio maneja validación más detallada.
+	customer, err := h.service.RegisterCustomer(&dto)
 	if err != nil {
 		return utils.SendError(c, fiber.StatusConflict, err.Error())
 	}
 
-	// On successful registration, you might want to log the user in
-	// and return tokens, or just return a success message.
-	return utils.SendSuccess(c, fiber.StatusCreated, nil, "Customer registered successfully. Please log in.")
+	// Construir respuesta completa con información del cliente
+	customerResponse := fiber.Map{
+		"id":                customer.ID,
+		"customer_number":   customer.CustomerNumber,
+		"email":             dto.Email, // Usar el email del DTO ya que está validado
+		"accepts_marketing": customer.AcceptsMarketing,
+	}
+
+	// Devolver información del cliente registrado
+	return utils.SendSuccess(c, fiber.StatusCreated, fiber.Map{
+		"customer": customerResponse,
+	}, "Cliente registrado exitosamente")
 }
 
 // GetProfile is the handler for retrieving the authenticated customer's profile.

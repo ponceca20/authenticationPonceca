@@ -39,11 +39,11 @@ type ContextSummaryDTO struct {
 
 // TokenResponseDTO defines the structure of the response when tokens are generated.
 type TokenResponseDTO struct {
-	AccessToken  string               `json:"access_token"`
-	RefreshToken string               `json:"refresh_token"`
-	ExpiresAt    time.Time            `json:"expires_at"`
-	Identity     IdentityProfileDTO   `json:"identity"`
-	Contexts     []ContextSummaryDTO  `json:"contexts"`
+	AccessToken  string              `json:"access_token"`
+	RefreshToken string              `json:"refresh_token"`
+	ExpiresAt    time.Time           `json:"expires_at"`
+	Identity     IdentityProfileDTO  `json:"identity"`
+	Contexts     []ContextSummaryDTO `json:"contexts"`
 }
 
 // ToIdentityProfileDTO converts an Identity model to a public DTO.
@@ -79,5 +79,6 @@ type ConvertGuestDTO struct {
 	FirstName         string `json:"first_name" validate:"required"`
 	LastName          string `json:"last_name" validate:"required"`
 	Email             string `json:"email" validate:"required,email"`
+	Phone             string `json:"phone,omitempty"`
 	Password          string `json:"password" validate:"required"`
 }

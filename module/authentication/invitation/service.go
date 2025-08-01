@@ -31,6 +31,12 @@ func NewInvitationService(repo InvitationRepository) InvitationService {
 
 // CreateInvitation handles the logic for creating a new user invitation.
 func (s *invitationService) CreateInvitation(orgID, inviterID string, dto *InvitationDTO) (*models.Invitation, error) {
+	// Validate that the role belongs to the organization
+	_, err := s.repo.ValidateRoleInOrganization(orgID, dto.RoleID)
+	if err != nil {
+		return nil, fmt.Errorf("role not found in organization: %w", err)
+	}
+
 	token, err := generateSecureToken(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate invitation token: %w", err)
@@ -95,16 +101,15 @@ func (s *invitationService) AcceptInvitation(dto *AcceptInvitationDTO) error {
 
 	// Prepare the new identity and membership
 	identity := &models.Identity{
-		ID:           uuid.New().String(),
-		Email:        invitation.Email,
-		FirstName:    dto.FirstName,
-		LastName:     dto.LastName,
-		PasswordHash: hashedPassword,
-		EmailVerified: true, // Email is verified by the act of receiving the invitation
+		ID:              uuid.New().String(),
+		Email:           invitation.Email,
+		FirstName:       dto.FirstName,
+		LastName:        dto.LastName,
+		PasswordHash:    hashedPassword,
+		EmailVerified:   true, // Email is verified by the act of receiving the invitation
 		EmailVerifiedAt: &time.Time{},
 	}
 	*identity.EmailVerifiedAt = time.Now()
-
 
 	membership := &models.OrganizationalMembership{
 		ID:         uuid.New().String(),

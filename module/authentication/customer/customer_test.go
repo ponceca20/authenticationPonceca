@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"practicev2/config"
 	"practicev2/module/authentication/auth"
+	"practicev2/module/authentication/guest"
 	"practicev2/module/authentication/models"
 	"testing"
 	"time"
@@ -20,6 +21,8 @@ type CustomerTestSuite struct {
 	db              *gorm.DB
 	customerRepo    CustomerRepository
 	authRepo        auth.AuthRepository
+	guestRepo       guest.GuestRepository
+	guestService    guest.GuestService
 	customerService CustomerService
 	testIdentity    *models.Identity
 }
@@ -43,6 +46,7 @@ func (suite *CustomerTestSuite) setupTestDatabase() *gorm.DB {
 		&models.CustomerPreferences{},
 		&models.ShippingAddress{},
 		&models.RefreshToken{},
+		&models.GuestSession{},
 	)
 	if err != nil {
 		suite.T().Fatalf("Failed to run migrations: %v", err)
@@ -55,7 +59,9 @@ func (suite *CustomerTestSuite) SetupSuite() {
 	suite.db = suite.setupTestDatabase()
 	suite.customerRepo = NewCustomerRepository(suite.db)
 	suite.authRepo = auth.NewAuthRepository(suite.db)
-	suite.customerService = NewCustomerService(suite.customerRepo, suite.authRepo)
+	suite.guestRepo = guest.NewGuestRepository(suite.db)
+	suite.guestService = guest.NewGuestService(suite.guestRepo)
+	suite.customerService = NewCustomerService(suite.customerRepo, suite.authRepo, suite.guestService)
 
 	// Create a test customer with unique email
 	rand.Seed(time.Now().UnixNano())

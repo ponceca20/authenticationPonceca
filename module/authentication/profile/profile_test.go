@@ -54,9 +54,16 @@ func (suite *ProfileTestSuite) SetupSuite() {
 // SetupTest runs before each individual test to ensure clean state
 func (suite *ProfileTestSuite) SetupTest() {
 	// Clean all test data to ensure complete isolation
-	suite.db.Exec("DELETE FROM user_profile")
-	suite.db.Exec("DELETE FROM refresh_token")
-	suite.db.Exec("DELETE FROM identity")
+	// Check if tables exist before trying to clean them
+	if suite.db.Migrator().HasTable(&models.UserProfile{}) {
+		suite.db.Exec("DELETE FROM user_profile")
+	}
+	if suite.db.Migrator().HasTable(&models.RefreshToken{}) {
+		suite.db.Exec("DELETE FROM refresh_token")
+	}
+	if suite.db.Migrator().HasTable(&models.Identity{}) {
+		suite.db.Exec("DELETE FROM identity")
+	}
 
 	// Small sleep to ensure different timestamps between tests
 	time.Sleep(5 * time.Millisecond)
@@ -69,7 +76,7 @@ func (suite *ProfileTestSuite) SetupTest() {
 		FirstName: "Profile",
 		LastName:  "User",
 		Email:     uniqueEmail,
-		Password:  "profile-password",
+		Password:  "Profile-Password123", // Fixed: Added uppercase, lowercase, and number
 	}
 	identity, err := authService.Register(registerDTO)
 	if err != nil {

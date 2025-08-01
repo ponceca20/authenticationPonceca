@@ -22,6 +22,7 @@ func NewRoleHandler(roleService RoleService, userService user.UserService) *Role
 // CreateRole is the handler for creating a new role in an organization.
 func (h *RoleHandler) CreateRole(c *fiber.Ctx) error {
 	authCtx, ok := c.Locals("authContext").(*middleware.AuthContext)
+
 	if !ok || authCtx.CurrentOrg == nil {
 		return utils.SendError(c, fiber.StatusForbidden, "Organization context not found")
 	}

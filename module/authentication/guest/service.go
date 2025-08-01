@@ -64,7 +64,7 @@ func (s *guestService) UpdateCart(token, cartData string) (*models.GuestSession,
 		return nil, fmt.Errorf("invalid or expired session token")
 	}
 
-	session.CartData = cartData
+	session.CartData = &cartData
 	session.LastActivity = time.Now()
 
 	if err := s.repo.UpdateSession(session); err != nil {

@@ -1,6 +1,12 @@
 package audit
 
-import "math"
+import (
+	"math"
+	"practicev2/module/authentication/models"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // PaginatedAuditResponse is a struct for paginated audit log responses.
 type PaginatedAuditResponse struct {
@@ -14,6 +20,8 @@ type PaginatedAuditResponse struct {
 // AuditService defines the interface for audit-related business logic.
 type AuditService interface {
 	ListAuditLogs(orgID string, query *AuditQueryDTO) (*PaginatedAuditResponse, error)
+	LogAction(identityID string, action string, resource string, resourceID string, status string, organizationID *string, details string, ipAddress string, userAgent string) error
+	GetAuditLogsByIdentityID(identityID string) ([]models.AuditLog, error)
 }
 
 type auditService struct {
@@ -44,4 +52,28 @@ func (s *auditService) ListAuditLogs(orgID string, query *AuditQueryDTO) (*Pagin
 		PageSize:   query.PageSize,
 		TotalPages: int(math.Ceil(float64(total) / float64(query.PageSize))),
 	}, nil
+}
+
+// LogAction logs an action performed by a user to the audit log.
+func (s *auditService) LogAction(identityID string, action string, resource string, resourceID string, status string, organizationID *string, details string, ipAddress string, userAgent string) error {
+	auditLog := &models.AuditLog{
+		ID:             uuid.New().String(),
+		IdentityID:     identityID,
+		Action:         action,
+		Resource:       resource,
+		ResourceID:     resourceID,
+		Status:         status,
+		OrganizationID: organizationID,
+		Details:        details,
+		IPAddress:      ipAddress,
+		UserAgent:      userAgent,
+		Timestamp:      time.Now(),
+	}
+
+	return s.repo.CreateAuditLog(auditLog)
+}
+
+// GetAuditLogsByIdentityID retrieves all audit logs for a specific identity.
+func (s *auditService) GetAuditLogsByIdentityID(identityID string) ([]models.AuditLog, error) {
+	return s.repo.GetAuditLogsByIdentityID(identityID)
 }

@@ -3,6 +3,7 @@ package integration
 import (
 	"fmt"
 	"practicev2/config"
+	"practicev2/module/authentication/audit"
 	"practicev2/module/authentication/auth"
 	"practicev2/module/authentication/customer"
 	"practicev2/module/authentication/guest"
@@ -31,6 +32,7 @@ type AuthLifecycleTestSuite struct {
 	invitationService invitation.InvitationService
 	guestService      guest.GuestService
 	customerService   customer.CustomerService
+	auditService      audit.AuditService
 	authRepo          auth.AuthRepository
 	customerRepo      customer.CustomerRepository
 
@@ -71,6 +73,7 @@ func (suite *AuthLifecycleTestSuite) SetupSuite() {
 	invitationRepo := invitation.NewInvitationRepository(suite.db)
 	guestRepo := guest.NewGuestRepository(suite.db)
 	suite.customerRepo = customer.NewCustomerRepository(suite.db)
+	auditRepo := audit.NewAuditRepository(suite.db)
 
 	// Services
 	suite.guestService = guest.NewGuestService(guestRepo)
@@ -79,6 +82,7 @@ func (suite *AuthLifecycleTestSuite) SetupSuite() {
 	suite.orgService = organization.NewOrganizationService(orgRepo, suite.authRepo)
 	suite.roleService = role.NewRoleService(roleRepo)
 	suite.invitationService = invitation.NewInvitationService(invitationRepo)
+	suite.auditService = audit.NewAuditService(auditRepo)
 }
 
 func (suite *AuthLifecycleTestSuite) SetupTest() {
@@ -167,17 +171,62 @@ func (suite *AuthLifecycleTestSuite) TestPhase2_GuestLifecycle() {
 		retrievedSession, err := suite.guestService.GetSession(session.SessionToken)
 		require.NoError(err)
 		require.Equal(session.ID, retrievedSession.ID)
-		assert.Empty(retrievedSession.CartData)
+		assert.Nil(retrievedSession.CartData)
 		cartJSON := `{"items":[{"id":"prod_123","quantity":2}],"total":99.98}`
 		updatedSession, err := suite.guestService.UpdateCart(session.SessionToken, cartJSON)
 		require.NoError(err)
-		assert.Equal(cartJSON, updatedSession.CartData)
+		assert.NotNil(updatedSession.CartData)
+		assert.Equal(cartJSON, *updatedSession.CartData)
 		retrievedAfterUpdate, err := suite.guestService.GetSession(session.SessionToken)
 		require.NoError(err)
-		assert.Equal(cartJSON, retrievedAfterUpdate.CartData)
+		assert.NotNil(retrievedAfterUpdate.CartData)
+		assert.Equal(cartJSON, *retrievedAfterUpdate.CartData)
 	})
 	suite.T().Run("should convert guest to registered user", func(t *testing.T) {
-		t.Skip("Skipping test: Guest-to-user conversion feature is not yet implemented in any service.")
+		// First, create a guest session with some cart data
+		session, err := suite.guestService.CreateGuestSession()
+		require.NoError(err)
+		require.NotNil(session)
+
+		cartJSON := `{"items":[{"id":"prod_456","quantity":1}],"total":49.99}`
+		_, err = suite.guestService.UpdateCart(session.SessionToken, cartJSON)
+		require.NoError(err)
+
+		// Now convert the guest to a registered user
+		convertDTO := &auth.ConvertGuestDTO{
+			GuestSessionToken: session.SessionToken,
+			FirstName:         "Former",
+			LastName:          "Guest",
+			Email:             "former.guest@example.com",
+			Password:          "a-Strong-Guest-Password123!",
+		}
+
+		newIdentity, err := suite.customerService.RegisterCustomerFromGuest(convertDTO)
+		require.NoError(err)
+		require.NotNil(newIdentity)
+		assert.Equal("Former", newIdentity.FirstName)
+		assert.Equal("Guest", newIdentity.LastName)
+		assert.Equal("former.guest@example.com", newIdentity.Email)
+
+		// Verify that a customer profile was created
+		customerProfile, err := suite.customerService.GetCustomerProfile(newIdentity.ID)
+		require.NoError(err)
+		require.NotNil(customerProfile)
+		assert.NotEmpty(customerProfile.CustomerNumber)
+
+		// Verify that the guest session was deleted
+		_, err = suite.guestService.GetSession(session.SessionToken)
+		assert.Error(err, "Guest session should be deleted after conversion")
+
+		// Verify that the new user can log in
+		loginDTO := &auth.LoginDTO{
+			Email:    "former.guest@example.com",
+			Password: "a-Strong-Guest-Password123!",
+		}
+		loginResponse, err := suite.authService.Login(loginDTO)
+		require.NoError(err)
+		require.NotEmpty(loginResponse.AccessToken)
+		assert.Equal(newIdentity.ID, loginResponse.Identity.ID)
 	})
 }
 
@@ -289,10 +338,391 @@ func (suite *AuthLifecycleTestSuite) TestPhase5_SecurityAndEdgeCases() {
 	require := require.New(suite.T())
 	assert := assert.New(suite.T())
 	suite.T().Run("should prevent cross-tenant access", func(t *testing.T) {
-		t.Skip("Skipping test: Tenant isolation is enforced by middleware and requires HTTP-level testing, which is not yet set up.")
+		// Test Strategy: Create two separate organizations and verify that users from one
+		// organization cannot access resources from another organization at the service level
+
+		// Step 1: Create first organization (TenantA)
+		orgADTO := &organization.OrganizationRegistrationDTO{
+			Identity: auth.RegisterDTO{
+				FirstName: "CEO", LastName: "TenantA", Email: "ceo.tenanta@example.com", Password: "a-Very-Strong-Password123!",
+			},
+			Name: "Tenant A Corp", Type: "company",
+		}
+		orgA, err := suite.orgService.CreateOrganization(orgADTO)
+		require.NoError(err, "Should create organization A")
+
+		// Step 2: Create second organization (TenantB)
+		orgBDTO := &organization.OrganizationRegistrationDTO{
+			Identity: auth.RegisterDTO{
+				FirstName: "CEO", LastName: "TenantB", Email: "ceo.tenantb@example.com", Password: "a-Very-Strong-Password123!",
+			},
+			Name: "Tenant B Corp", Type: "company",
+		}
+		orgB, err := suite.orgService.CreateOrganization(orgBDTO)
+		require.NoError(err, "Should create organization B")
+
+		// Step 3: Get the founders (they should only access their own organization)
+		founderA, err := suite.authRepo.FindIdentityByEmail(orgADTO.Identity.Email)
+		require.NoError(err)
+		founderB, err := suite.authRepo.FindIdentityByEmail(orgBDTO.Identity.Email)
+		require.NoError(err)
+
+		// Step 4: Create roles in each organization
+		roleADTO := &role.RoleDTO{
+			Name:        "manager",
+			DisplayName: "Manager A",
+			Permissions: []role.PermissionDTO{
+				{Resource: "users", Actions: []string{"read"}, Scope: "organization"},
+			},
+		}
+		roleA, err := suite.roleService.CreateRole(orgA.ID, roleADTO)
+		require.NoError(err, "Should create role in organization A")
+
+		roleBDTO := &role.RoleDTO{
+			Name:        "manager",
+			DisplayName: "Manager B",
+			Permissions: []role.PermissionDTO{
+				{Resource: "users", Actions: []string{"read"}, Scope: "organization"},
+			},
+		}
+		roleB, err := suite.roleService.CreateRole(orgB.ID, roleBDTO)
+		require.NoError(err, "Should create role in organization B")
+
+		// Step 5: Verify cross-tenant isolation at the service level
+
+		// Test 5a: Verify that roles from org A cannot be accessed when querying for org B
+		rolesInOrgA, err := suite.roleService.ListRoles(orgA.ID)
+		require.NoError(err)
+		rolesInOrgB, err := suite.roleService.ListRoles(orgB.ID)
+		require.NoError(err)
+
+		// Verify that each organization only sees its own roles
+		foundRoleAInOrgA := false
+		foundRoleBInOrgA := false
+		for _, roleDto := range rolesInOrgA {
+			if roleDto.ID == roleA.ID {
+				foundRoleAInOrgA = true
+			}
+			if roleDto.ID == roleB.ID {
+				foundRoleBInOrgA = true
+			}
+		}
+
+		foundRoleAInOrgB := false
+		foundRoleBInOrgB := false
+		for _, roleDto := range rolesInOrgB {
+			if roleDto.ID == roleA.ID {
+				foundRoleAInOrgB = true
+			}
+			if roleDto.ID == roleB.ID {
+				foundRoleBInOrgB = true
+			}
+		}
+
+		// Assertions for role isolation
+		assert.True(foundRoleAInOrgA, "Organization A should see its own role")
+		assert.False(foundRoleBInOrgA, "Organization A should NOT see organization B's role")
+		assert.True(foundRoleBInOrgB, "Organization B should see its own role")
+		assert.False(foundRoleAInOrgB, "Organization B should NOT see organization A's role")
+
+		// Test 5b: Verify organizational membership isolation
+		// Get memberships for each organization
+		var membershipsOrgA []models.OrganizationalMembership
+		err = suite.db.Where("organization_id = ?", orgA.ID).Find(&membershipsOrgA).Error
+		require.NoError(err)
+
+		var membershipsOrgB []models.OrganizationalMembership
+		err = suite.db.Where("organization_id = ?", orgB.ID).Find(&membershipsOrgB).Error
+		require.NoError(err)
+
+		// Verify that each organization only has its own members
+		foundFounderAInOrgA := false
+		foundFounderBInOrgA := false
+		for _, membership := range membershipsOrgA {
+			if membership.IdentityID == founderA.ID {
+				foundFounderAInOrgA = true
+			}
+			if membership.IdentityID == founderB.ID {
+				foundFounderBInOrgA = true
+			}
+		}
+
+		foundFounderAInOrgB := false
+		foundFounderBInOrgB := false
+		for _, membership := range membershipsOrgB {
+			if membership.IdentityID == founderA.ID {
+				foundFounderAInOrgB = true
+			}
+			if membership.IdentityID == founderB.ID {
+				foundFounderBInOrgB = true
+			}
+		}
+
+		// Assertions for membership isolation
+		assert.True(foundFounderAInOrgA, "Founder A should be member of organization A")
+		assert.False(foundFounderBInOrgA, "Founder B should NOT be member of organization A")
+		assert.True(foundFounderBInOrgB, "Founder B should be member of organization B")
+		assert.False(foundFounderAInOrgB, "Founder A should NOT be member of organization B")
+
+		// Test 5c: Create invitations and verify they're scoped to organizations
+		inviteADTO := &invitation.InvitationDTO{
+			Email:  "employee.a@example.com",
+			RoleID: roleA.ID,
+		}
+		inviteA, err := suite.invitationService.CreateInvitation(orgA.ID, founderA.ID, inviteADTO)
+		require.NoError(err, "Should create invitation for organization A")
+
+		inviteBDTO := &invitation.InvitationDTO{
+			Email:  "employee.b@example.com",
+			RoleID: roleB.ID,
+		}
+		inviteB, err := suite.invitationService.CreateInvitation(orgB.ID, founderB.ID, inviteBDTO)
+		require.NoError(err, "Should create invitation for organization B")
+
+		// Verify invitation isolation
+		var invitationsOrgA []models.Invitation
+		err = suite.db.Where("organization_id = ?", orgA.ID).Find(&invitationsOrgA).Error
+		require.NoError(err)
+
+		var invitationsOrgB []models.Invitation
+		err = suite.db.Where("organization_id = ?", orgB.ID).Find(&invitationsOrgB).Error
+		require.NoError(err)
+
+		foundInviteAInOrgA := false
+		foundInviteBInOrgA := false
+		for _, inv := range invitationsOrgA {
+			if inv.ID == inviteA.ID {
+				foundInviteAInOrgA = true
+			}
+			if inv.ID == inviteB.ID {
+				foundInviteBInOrgA = true
+			}
+		}
+
+		foundInviteAInOrgB := false
+		foundInviteBInOrgB := false
+		for _, inv := range invitationsOrgB {
+			if inv.ID == inviteA.ID {
+				foundInviteAInOrgB = true
+			}
+			if inv.ID == inviteB.ID {
+				foundInviteBInOrgB = true
+			}
+		}
+
+		// Assertions for invitation isolation
+		assert.True(foundInviteAInOrgA, "Organization A should see its own invitation")
+		assert.False(foundInviteBInOrgA, "Organization A should NOT see organization B's invitation")
+		assert.True(foundInviteBInOrgB, "Organization B should see its own invitation")
+		assert.False(foundInviteAInOrgB, "Organization B should NOT see organization A's invitation")
+
+		// Test 5d: Verify audit logs are properly scoped (if we have organization-scoped logs)
+		if suite.auditService != nil {
+			// Log some organization-specific events
+			err = suite.auditService.LogAction(
+				founderA.ID,
+				"role.create",
+				"role",
+				roleA.ID,
+				"success",
+				&orgA.ID,
+				`{"role_name":"manager","organization":"Tenant A Corp"}`,
+				"192.168.1.100",
+				"test-browser",
+			)
+			require.NoError(err)
+
+			err = suite.auditService.LogAction(
+				founderB.ID,
+				"role.create",
+				"role",
+				roleB.ID,
+				"success",
+				&orgB.ID,
+				`{"role_name":"manager","organization":"Tenant B Corp"}`,
+				"192.168.1.101",
+				"test-browser",
+			)
+			require.NoError(err)
+
+			// Query audit logs for each organization and verify isolation
+			var auditLogsOrgA []models.AuditLog
+			err = suite.db.Where("organization_id = ?", orgA.ID).Find(&auditLogsOrgA).Error
+			require.NoError(err)
+
+			var auditLogsOrgB []models.AuditLog
+			err = suite.db.Where("organization_id = ?", orgB.ID).Find(&auditLogsOrgB).Error
+			require.NoError(err)
+
+			// Verify audit log isolation
+			foundOrgALogInOrgA := false
+			foundOrgBLogInOrgA := false
+			for _, log := range auditLogsOrgA {
+				if log.ResourceID == roleA.ID && log.Action == "role.create" {
+					foundOrgALogInOrgA = true
+				}
+				if log.ResourceID == roleB.ID && log.Action == "role.create" {
+					foundOrgBLogInOrgA = true
+				}
+			}
+
+			foundOrgALogInOrgB := false
+			foundOrgBLogInOrgB := false
+			for _, log := range auditLogsOrgB {
+				if log.ResourceID == roleA.ID && log.Action == "role.create" {
+					foundOrgALogInOrgB = true
+				}
+				if log.ResourceID == roleB.ID && log.Action == "role.create" {
+					foundOrgBLogInOrgB = true
+				}
+			}
+
+			assert.True(foundOrgALogInOrgA, "Organization A should see its own audit logs")
+			assert.False(foundOrgBLogInOrgA, "Organization A should NOT see organization B's audit logs")
+			assert.True(foundOrgBLogInOrgB, "Organization B should see its own audit logs")
+			assert.False(foundOrgALogInOrgB, "Organization B should NOT see organization A's audit logs")
+		}
+
+		// Test 5e: Verify that attempting to use a role from another organization fails
+		// This simulates what would happen if someone tried to bypass tenant isolation
+
+		// Try to create an invitation in Org A using a role from Org B (should fail)
+		invalidInviteDTO := &invitation.InvitationDTO{
+			Email:  "malicious.user@example.com",
+			RoleID: roleB.ID, // This role belongs to Org B, not Org A
+		}
+
+		// This should fail because roleB.ID doesn't belong to orgA.ID
+		_, err = suite.invitationService.CreateInvitation(orgA.ID, founderA.ID, invalidInviteDTO)
+		assert.Error(err, "Should not be able to create invitation with role from different organization")
+		if err != nil {
+			assert.Contains(err.Error(), "role not found", "Error should indicate role validation failure")
+		}
 	})
 	suite.T().Run("should create audit logs for key events", func(t *testing.T) {
-		t.Skip("Skipping test: Audit log verification requires integration with the AuditService, which is not yet set up.")
+		// Test 1: Log a login event
+		err := suite.auditService.LogAction(
+			suite.adminUser.ID,
+			"user.login",
+			"identity",
+			suite.adminUser.ID,
+			"success",
+			nil, // system-level event
+			`{"ip":"192.168.1.100","user_agent":"test-browser"}`,
+			"192.168.1.100",
+			"test-browser",
+		)
+		require.NoError(err, "Should be able to log login action")
+
+		// Test 2: Log a password change event
+		err = suite.auditService.LogAction(
+			suite.adminUser.ID,
+			"user.password_change",
+			"identity",
+			suite.adminUser.ID,
+			"success",
+			nil,
+			`{"method":"manual"}`,
+			"192.168.1.100",
+			"test-browser",
+		)
+		require.NoError(err, "Should be able to log password change action")
+
+		// Test 3: Log a failed login attempt
+		err = suite.auditService.LogAction(
+			suite.adminUser.ID,
+			"user.login",
+			"identity",
+			suite.adminUser.ID,
+			"failure",
+			nil,
+			`{"reason":"invalid_credentials","attempts":1}`,
+			"192.168.1.101",
+			"test-browser",
+		)
+		require.NoError(err, "Should be able to log failed login action")
+
+		// Test 4: Verify audit logs were created
+		auditLogs, err := suite.auditService.GetAuditLogsByIdentityID(suite.adminUser.ID)
+		require.NoError(err, "Should be able to retrieve audit logs")
+		assert.GreaterOrEqual(len(auditLogs), 3, "Should have at least 3 audit log entries")
+
+		// Test 5: Verify the content of specific audit logs
+		loginSuccessFound := false
+		passwordChangeFound := false
+		loginFailureFound := false
+
+		for _, log := range auditLogs {
+			assert.Equal(suite.adminUser.ID, log.IdentityID, "All logs should belong to the admin user")
+			assert.NotEmpty(log.ID, "Audit log should have an ID")
+			assert.NotZero(log.Timestamp, "Audit log should have a timestamp")
+
+			switch log.Action {
+			case "user.login":
+				if log.Status == "success" {
+					loginSuccessFound = true
+					assert.Equal("identity", log.Resource)
+					assert.Equal("192.168.1.100", log.IPAddress)
+					assert.Equal("test-browser", log.UserAgent)
+				} else if log.Status == "failure" {
+					loginFailureFound = true
+					assert.Equal("192.168.1.101", log.IPAddress)
+					assert.Contains(log.Details, "invalid_credentials")
+				}
+			case "user.password_change":
+				passwordChangeFound = true
+				assert.Equal("success", log.Status)
+				assert.Contains(log.Details, "manual")
+			}
+		}
+
+		assert.True(loginSuccessFound, "Should find successful login audit log")
+		assert.True(passwordChangeFound, "Should find password change audit log")
+		assert.True(loginFailureFound, "Should find failed login audit log")
+
+		// Test 6: Create an organization-scoped audit log
+		// First create an organization for testing
+		orgDTO := &organization.OrganizationRegistrationDTO{
+			Identity: auth.RegisterDTO{
+				FirstName: "Audit", LastName: "TestOrg", Email: "audit.testorg@example.com", Password: "a-Very-Strong-Password123!",
+			},
+			Name: "Audit Test Corp", Type: "company",
+		}
+		org, err := suite.orgService.CreateOrganization(orgDTO)
+		require.NoError(err)
+
+		founder, err := suite.authRepo.FindIdentityByEmail(orgDTO.Identity.Email)
+		require.NoError(err)
+
+		// Log an organization-scoped event
+		err = suite.auditService.LogAction(
+			founder.ID,
+			"organization.create",
+			"organization",
+			org.ID,
+			"success",
+			&org.ID, // organization-scoped event
+			`{"organization_name":"Audit Test Corp","type":"company"}`,
+			"192.168.1.102",
+			"test-browser",
+		)
+		require.NoError(err, "Should be able to log organization creation")
+
+		// Verify organization-scoped audit log
+		founderAuditLogs, err := suite.auditService.GetAuditLogsByIdentityID(founder.ID)
+		require.NoError(err)
+
+		orgCreationFound := false
+		for _, log := range founderAuditLogs {
+			if log.Action == "organization.create" && log.Status == "success" {
+				orgCreationFound = true
+				assert.Equal(org.ID, *log.OrganizationID, "Should have correct organization ID")
+				assert.Equal("organization", log.Resource)
+				assert.Equal(org.ID, log.ResourceID)
+				assert.Contains(log.Details, "Audit Test Corp")
+			}
+		}
+		assert.True(orgCreationFound, "Should find organization creation audit log")
 	})
 	suite.T().Run("should allow password recovery flow", func(t *testing.T) {
 		err := suite.authService.ForgotPassword(&auth.ForgotPasswordDTO{Email: suite.adminUser.Email})

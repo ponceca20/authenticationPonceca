@@ -15,6 +15,7 @@ type InvitationRepository interface {
 	ListInvitationsByOrganization(orgID string) ([]models.Invitation, error)
 	FindInvitationByID(orgID, invID string) (*models.Invitation, error)
 	DeleteInvitation(invitation *models.Invitation) error
+	ValidateRoleInOrganization(orgID, roleID string) (*models.Role, error)
 }
 
 type invitationRepository struct {
@@ -94,4 +95,11 @@ func (r *invitationRepository) FindInvitationByID(orgID, invID string) (*models.
 func (r *invitationRepository) DeleteInvitation(invitation *models.Invitation) error {
 	// Use Unscoped() to perform a hard delete, as this is for a pending invitation.
 	return r.db.Unscoped().Delete(invitation).Error
+}
+
+// ValidateRoleInOrganization checks if a role belongs to the specified organization.
+func (r *invitationRepository) ValidateRoleInOrganization(orgID, roleID string) (*models.Role, error) {
+	var role models.Role
+	err := r.db.Where("id = ? AND organization_id = ?", roleID, orgID).First(&role).Error
+	return &role, err
 }

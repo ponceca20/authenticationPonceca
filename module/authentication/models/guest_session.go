@@ -14,7 +14,7 @@ type GuestSession struct {
 	Phone     string `json:"phone,omitempty" gorm:"size:20"`
 
 	// Activity tracking
-	CartData     string    `json:"cart_data,omitempty" gorm:"type:json"` // JSON blob for cart
+	CartData     *string   `json:"cart_data,omitempty" gorm:"type:json"` // JSON blob for cart
 	LastActivity time.Time `json:"last_activity" gorm:"not null"`
 	IPAddress    string    `json:"ip_address,omitempty" gorm:"size:45"` // IPv6 support
 	UserAgent    string    `json:"user_agent,omitempty" gorm:"size:1000"`

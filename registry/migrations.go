@@ -23,13 +23,16 @@ func RegisterMigration(order int, migrate MigrationFunc) {
 }
 
 // RunMigrations ordena y ejecuta todas las migraciones registradas.
-func RunMigrations(db *gorm.DB) {
+func RunMigrations(db *gorm.DB) error {
 	sort.SliceStable(migrations, func(i, j int) bool {
 		return migrations[i].order < migrations[j].order
 	})
+
 	for _, m := range migrations {
 		if err := m.migrate(db); err != nil {
-			panic("Migration failed: " + err.Error())
+			return err
 		}
 	}
+
+	return nil
 }

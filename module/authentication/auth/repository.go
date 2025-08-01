@@ -63,8 +63,8 @@ func (r *authRepository) GetFullIdentityContext(identityID string) (*models.Iden
 	}
 
 	var memberships []models.OrganizationalMembership
-	// Preload the Role to get the role name for the JWT claims
-	r.db.Preload("Role").Where("identity_id = ? AND is_active = ?", identityID, true).Find(&memberships)
+	// Preload the Role and Organization to get complete membership context
+	r.db.Preload("Role").Preload("Organization").Where("identity_id = ? AND is_active = ?", identityID, true).Find(&memberships)
 
 	var customerProfile models.CustomerProfile
 	err := r.db.Where("identity_id = ?", identityID).First(&customerProfile).Error

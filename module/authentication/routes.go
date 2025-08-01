@@ -49,8 +49,8 @@ func RegisterRoutes(app *fiber.App) {
 	roleService := role.NewRoleService(roleRepo)
 	profileService := profile.NewProfileService(profileRepo, db)
 	invitationService := invitation.NewInvitationService(invitationRepo)
-	customerService := customer.NewCustomerService(customerRepo, authRepo)
 	guestService := guest.NewGuestService(guestRepo)
+	customerService := customer.NewCustomerService(customerRepo, authRepo, guestService)
 	departmentService := department.NewDepartmentService(departmentRepo)
 	auditService := audit.NewAuditService(auditRepo)
 	unifiedService := unified.NewUnifiedService(unifiedRepo)
@@ -157,9 +157,9 @@ func RegisterRoutes(app *fiber.App) {
 	p.Post("/users/bulk-create", userHandler.BulkCreateUsers)
 
 	// Add missing customer routes
-	customerRoutes.Post("/logout", authHandler.Logout) // Reuse auth logout
-	customerRoutes.Post("/refresh", authHandler.RefreshToken) // Reuse auth refresh
-	customerRoutes.Delete("/profile", customerHandler.DeleteProfile) // Placeholder
+	customerRoutes.Post("/logout", authHandler.Logout)                              // Reuse auth logout
+	customerRoutes.Post("/refresh", authHandler.RefreshToken)                       // Reuse auth refresh
+	customerRoutes.Delete("/profile", customerHandler.DeleteProfile)                // Placeholder
 	customerRoutes.Put("/addresses/:id/default", customerHandler.SetDefaultAddress) // Placeholder
 	customerRoutes.Get("/preferences", customerHandler.GetPreferences)
 	customerRoutes.Put("/preferences", customerHandler.UpdatePreferences)

@@ -69,6 +69,7 @@ func (s *customerService) RegisterCustomer(dto *CustomerRegistrationDTO) (*model
 		FirstName:    dto.FirstName,
 		LastName:     dto.LastName,
 		Email:        dto.Email,
+		Phone:        dto.Phone,
 		PasswordHash: hashedPassword,
 	}
 
@@ -118,15 +119,15 @@ func (s *customerService) AddAddress(identityID string, dto *AddressDTO) (*model
 	}
 
 	address := &models.ShippingAddress{
-		ID:              uuid.New().String(),
+		ID:                uuid.New().String(),
 		CustomerProfileID: profile.ID,
-		AddressLine1:    dto.AddressLine1,
-		AddressLine2:    dto.AddressLine2,
-		City:            dto.City,
-		State:           dto.State,
-		PostalCode:      dto.PostalCode,
-		Country:         dto.Country,
-		IsDefault:       dto.IsDefault,
+		AddressLine1:      dto.AddressLine1,
+		AddressLine2:      dto.AddressLine2,
+		City:              dto.City,
+		State:             dto.State,
+		PostalCode:        dto.PostalCode,
+		Country:           dto.Country,
+		IsDefault:         dto.IsDefault,
 	}
 
 	if err := s.customerRepo.AddShippingAddress(address); err != nil {
@@ -223,6 +224,7 @@ func (s *customerService) RegisterCustomerFromGuest(dto *auth.ConvertGuestDTO) (
 		FirstName: dto.FirstName,
 		LastName:  dto.LastName,
 		Email:     dto.Email,
+		Phone:     dto.Phone,
 		Password:  dto.Password,
 	}
 

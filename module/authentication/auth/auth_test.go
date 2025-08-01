@@ -61,11 +61,22 @@ func (suite *AuthTestSuite) SetupSuite() {
 // SetupTest runs before each individual test to ensure clean state
 func (suite *AuthTestSuite) SetupTest() {
 	// Clean all test data to ensure complete isolation (only existing tables)
-	suite.db.Exec("DELETE FROM refresh_token")
-	suite.db.Exec("DELETE FROM password_reset_token")
-	suite.db.Exec("DELETE FROM customer_profile")
-	suite.db.Exec("DELETE FROM organizational_membership")
-	suite.db.Exec("DELETE FROM identity")
+	// Check if tables exist before trying to clean them
+	if suite.db.Migrator().HasTable(&models.RefreshToken{}) {
+		suite.db.Exec("DELETE FROM refresh_token")
+	}
+	if suite.db.Migrator().HasTable(&models.PasswordResetToken{}) {
+		suite.db.Exec("DELETE FROM password_reset_token")
+	}
+	if suite.db.Migrator().HasTable(&models.CustomerProfile{}) {
+		suite.db.Exec("DELETE FROM customer_profile")
+	}
+	if suite.db.Migrator().HasTable(&models.OrganizationalMembership{}) {
+		suite.db.Exec("DELETE FROM organizational_membership")
+	}
+	if suite.db.Migrator().HasTable(&models.Identity{}) {
+		suite.db.Exec("DELETE FROM identity")
+	}
 
 	// Small sleep to ensure different timestamps between tests
 	time.Sleep(5 * time.Millisecond)
@@ -87,7 +98,7 @@ func (suite *AuthTestSuite) TestRegisterAndLogin() {
 		FirstName: "John",
 		LastName:  "Doe",
 		Email:     suite.generateUniqueEmail("john.doe"),
-		Password:  "strong-password-123",
+		Password:  "Strong-Password-123", // Fixed: Added uppercase letter
 	}
 
 	identity, err := suite.service.Register(registerDTO)
@@ -104,7 +115,7 @@ func (suite *AuthTestSuite) TestRegisterAndLogin() {
 	// 3. Login with correct credentials
 	loginDTO := &LoginDTO{
 		Email:    registerDTO.Email,
-		Password: "strong-password-123",
+		Password: "Strong-Password-123", // Fixed: Added uppercase letter
 	}
 
 	tokenResponse, err := suite.service.Login(loginDTO)
@@ -137,7 +148,7 @@ func (suite *AuthTestSuite) TestRefreshToken() {
 		FirstName: "Jane",
 		LastName:  "Doe",
 		Email:     suite.generateUniqueEmail("jane.doe"),
-		Password:  "a-different-password",
+		Password:  "A-different-Password123", // Fixed: Added uppercase, lowercase, and number
 	}
 	_, err := suite.service.Register(registerDTO)
 	assert.NoError(suite.T(), err)
@@ -145,6 +156,7 @@ func (suite *AuthTestSuite) TestRefreshToken() {
 	loginDTO := &LoginDTO{Email: registerDTO.Email, Password: registerDTO.Password}
 	loginResponse, err := suite.service.Login(loginDTO)
 	assert.NoError(suite.T(), err)
+	assert.NotNil(suite.T(), loginResponse, "Login response should not be nil")
 	assert.NotEmpty(suite.T(), loginResponse.RefreshToken)
 
 	// Significant delay to ensure different timestamp for refresh token generation
@@ -169,7 +181,7 @@ func (suite *AuthTestSuite) TestLogout() {
 		FirstName: "Logout",
 		LastName:  "User",
 		Email:     suite.generateUniqueEmail("logout.user"),
-		Password:  "password-to-logout",
+		Password:  "Password-To-Logout123", // Fixed: Added uppercase, lowercase, and number
 	}
 	_, err := suite.service.Register(registerDTO)
 	assert.NoError(suite.T(), err)

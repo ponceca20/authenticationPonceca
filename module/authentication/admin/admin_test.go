@@ -78,7 +78,7 @@ func (suite *AdminTestSuite) TestGetSystemStats() {
 			FirstName: "Admin",
 			LastName:  "User",
 			Email:     "admin.user@example.com",
-			Password:  "secure-admin-password",
+			Password:  "Secure-Admin-Password123", // Fixed: Added uppercase, lowercase, and number
 		},
 		Name: "Admin Test Corp",
 		Type: "company",
@@ -91,7 +91,7 @@ func (suite *AdminTestSuite) TestGetSystemStats() {
 		FirstName: "Standalone",
 		LastName:  "User",
 		Email:     "standalone.user@example.com",
-		Password:  "standalone-password",
+		Password:  "Standalone-Password123", // Fixed: Added uppercase, lowercase, and number
 	}
 	authService := auth.NewAuthService(suite.authRepo, nil)
 	_, err = authService.Register(registerDTO)

@@ -57,7 +57,7 @@ func TestSmartAuthMiddleware(t *testing.T) {
 		FirstName: "Jane",
 		LastName:  "Doe",
 		Email:     "jane.doe@example.com",
-		Password:  "secure-password-456",
+		Password:  "Secure-Password-456", // Fixed: Added uppercase letter
 	}
 	identity, err := authService.Register(registerDTO)
 	assert.NoError(t, err)

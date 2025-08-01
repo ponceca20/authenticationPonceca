@@ -56,7 +56,7 @@ func (suite *UnifiedTestSuite) SetupSuite() {
 		FirstName: "Unified",
 		LastName:  "User",
 		Email:     "unified.user@example.com",
-		Password:  "unified-password",
+		Password:  "Unified-Password123", // Fixed: Added uppercase, lowercase, and number
 	}
 	identity, err := authService.Register(registerDTO)
 	assert.NoError(suite.T(), err)
@@ -98,7 +98,7 @@ func (suite *UnifiedTestSuite) TestGetDashboardDataMultipleUsers() {
 		FirstName: "Second",
 		LastName:  "User",
 		Email:     "second.unified@example.com",
-		Password:  "second-password",
+		Password:  "Second-Password123", // Fixed: Added uppercase, lowercase, and number
 	}
 	secondUser, err := authService.Register(registerDTO)
 	assert.NoError(suite.T(), err)
@@ -168,7 +168,7 @@ func (suite *UnifiedTestSuite) TestGetDashboardDataWithDifferentUserNames() {
 			FirstName: tc.firstName,
 			LastName:  "TestUser",
 			Email:     tc.email,
-			Password:  "test-password",
+			Password:  "Test-Password123", // Fixed: Added uppercase, lowercase, and number
 		}
 		user, err := authService.Register(registerDTO)
 		assert.NoError(suite.T(), err, "Failed to create user %d", i)

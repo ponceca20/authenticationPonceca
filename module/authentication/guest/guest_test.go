@@ -97,7 +97,8 @@ func (suite *GuestTestSuite) TestUpdateCart() {
 	updatedSession, err := suite.guestService.UpdateCart(session.SessionToken, cartData)
 	assert.NoError(suite.T(), err)
 	assert.NotNil(suite.T(), updatedSession)
-	assert.Equal(suite.T(), cartData, updatedSession.CartData)
+	assert.NotNil(suite.T(), updatedSession.CartData)
+	assert.Equal(suite.T(), cartData, *updatedSession.CartData)
 	assert.True(suite.T(), updatedSession.LastActivity.After(session.LastActivity) || updatedSession.LastActivity.Equal(session.LastActivity))
 
 	// 3. Verify the cart data persisted

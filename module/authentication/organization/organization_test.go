@@ -64,7 +64,7 @@ func (suite *OrganizationTestSuite) TestCreateOrganization() {
 			FirstName: "Admin",
 			LastName:  "User",
 			Email:     "org.admin@example.com",
-			Password:  "secure-org-password",
+			Password:  "Secure-Org-Password123", // Fixed: Added uppercase, lowercase, and number
 		},
 		Name: "Test Organization Inc.",
 		Type: "company",

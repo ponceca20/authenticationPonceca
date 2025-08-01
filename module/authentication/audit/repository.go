@@ -9,6 +9,8 @@ import (
 // AuditRepository defines the interface for database operations related to audit logs.
 type AuditRepository interface {
 	ListAuditLogs(orgID string, query *AuditQueryDTO) ([]models.AuditLog, int64, error)
+	CreateAuditLog(log *models.AuditLog) error
+	GetAuditLogsByIdentityID(identityID string) ([]models.AuditLog, error)
 }
 
 type auditRepository struct {
@@ -66,4 +68,16 @@ func (r *auditRepository) ListAuditLogs(orgID string, query *AuditQueryDTO) ([]m
 	}
 
 	return logs, total, nil
+}
+
+// CreateAuditLog creates a new audit log entry in the database.
+func (r *auditRepository) CreateAuditLog(log *models.AuditLog) error {
+	return r.db.Create(log).Error
+}
+
+// GetAuditLogsByIdentityID retrieves all audit logs for a specific identity.
+func (r *auditRepository) GetAuditLogsByIdentityID(identityID string) ([]models.AuditLog, error) {
+	var logs []models.AuditLog
+	err := r.db.Where("identity_id = ?", identityID).Preload("Identity").Order("timestamp desc").Find(&logs).Error
+	return logs, err
 }

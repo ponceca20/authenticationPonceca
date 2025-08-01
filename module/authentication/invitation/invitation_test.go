@@ -104,7 +104,7 @@ func (suite *InvitationTestSuite) TestInvitationLifecycle() {
 		Token:     createdInvite.Token,
 		FirstName: "New",
 		LastName:  "Invitee",
-		Password:  "new-password-strong",
+		Password:  "New-Password-Strong123", // Fixed: Added uppercase, lowercase, and number
 	}
 	err = suite.invitationService.AcceptInvitation(acceptDTO)
 	assert.NoError(suite.T(), err)

@@ -7,7 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-
 // InvitationHandler handles the HTTP requests for invitations.
 type InvitationHandler struct {
 	service InvitationService

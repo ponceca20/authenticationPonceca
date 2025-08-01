@@ -50,7 +50,24 @@ func SmartAuthMiddleware() fiber.Handler {
 		}
 
 		// Build the rich AuthContext from the claims
-		authCtx, err := buildAuthContext(repo, claims, c.Params("slug"))
+		orgSlug := c.Params("slug")
+
+		// Si no se obtuvo de los parámetros, intentar extraer de la URL manualmente
+		if orgSlug == "" {
+			path := c.OriginalURL()
+			// Formato esperado: /api/v1/org/{slug}/...
+			if strings.Contains(path, "/org/") {
+				parts := strings.Split(path, "/org/")
+				if len(parts) > 1 {
+					slugPart := strings.Split(parts[1], "/")[0]
+					if slugPart != "" {
+						orgSlug = slugPart
+					}
+				}
+			}
+		}
+
+		authCtx, err := buildAuthContext(repo, claims, orgSlug)
 		if err != nil {
 			return utils.SendError(c, fiber.StatusForbidden, "Invalid authentication context", err)
 		}
@@ -82,6 +99,7 @@ func buildAuthContext(repo auth.AuthRepository, claims *utils.UnifiedClaims, org
 	// If an organization context is specified in the request, find the relevant membership
 	if orgSlug != "" {
 		var currentMembership *models.OrganizationalMembership
+
 		for _, m := range memberships {
 			if m.Organization.Slug == orgSlug {
 				currentMembership = &m
