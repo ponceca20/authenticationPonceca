@@ -5,9 +5,9 @@ import "time"
 // Role defines a set of permissions within an organization.
 type Role struct {
 	ID             string       `json:"id" gorm:"primaryKey;type:varchar(36)"`
-	OrganizationID string       `json:"organization_id" gorm:"index;type:varchar(36);not null"`
+	OrganizationID string       `json:"organization_id" gorm:"type:varchar(36);not null;uniqueIndex:idx_org_role_name,priority:1"`
 	Organization   Organization `json:"organization" gorm:"foreignKey:OrganizationID"`
-	Name           string       `json:"name" gorm:"not null;size:100;uniqueIndex:idx_org_role_name"`
+	Name           string       `json:"name" gorm:"not null;size:100;uniqueIndex:idx_org_role_name,priority:2"`
 	DisplayName    string       `json:"display_name" gorm:"size:255"`
 	Description    string       `json:"description" gorm:"size:500"`
 	HierarchyLevel int          `json:"hierarchy_level" gorm:"default:0;type:smallint"`

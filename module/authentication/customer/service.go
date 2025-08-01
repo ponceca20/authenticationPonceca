@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"practicev2/module/authentication/auth"
+	"practicev2/module/authentication/guest"
 	"practicev2/module/authentication/models"
 	"practicev2/module/authentication/utils"
 
@@ -14,6 +15,7 @@ import (
 // CustomerService defines the interface for customer-related business logic.
 type CustomerService interface {
 	RegisterCustomer(dto *CustomerRegistrationDTO) (*models.CustomerProfile, error)
+	RegisterCustomerFromGuest(dto *auth.ConvertGuestDTO) (*models.Identity, error)
 	GetCustomerProfile(identityID string) (*CustomerProfileDTO, error)
 	AddAddress(identityID string, dto *AddressDTO) (*models.ShippingAddress, error)
 	ListAddresses(identityID string) ([]models.ShippingAddress, error)
@@ -25,12 +27,21 @@ type CustomerService interface {
 
 type customerService struct {
 	customerRepo CustomerRepository
-	authRepo     auth.AuthRepository // To check for existing identities
+	authRepo     auth.AuthRepository
+	guestService guest.GuestService
 }
 
 // NewCustomerService creates a new instance of CustomerService.
-func NewCustomerService(customerRepo CustomerRepository, authRepo auth.AuthRepository) CustomerService {
-	return &customerService{customerRepo: customerRepo, authRepo: authRepo}
+func NewCustomerService(
+	customerRepo CustomerRepository,
+	authRepo auth.AuthRepository,
+	guestService guest.GuestService,
+) CustomerService {
+	return &customerService{
+		customerRepo: customerRepo,
+		authRepo:     authRepo,
+		guestService: guestService,
+	}
 }
 
 // RegisterCustomer handles the logic for creating a new e-commerce customer.
@@ -197,6 +208,41 @@ func (s *customerService) GetPreferences(identityID string) (*models.CustomerPre
 		return nil, err
 	}
 	return prefs, nil
+}
+
+// RegisterCustomerFromGuest converts a guest session into a full customer account.
+func (s *customerService) RegisterCustomerFromGuest(dto *auth.ConvertGuestDTO) (*models.Identity, error) {
+	// 1. Validate the guest session
+	_, err := s.guestService.GetSession(dto.GuestSessionToken)
+	if err != nil {
+		return nil, errors.New("invalid or expired guest session")
+	}
+
+	// 2. Use the existing RegisterCustomer logic, which handles identity creation
+	regDTO := &CustomerRegistrationDTO{
+		FirstName: dto.FirstName,
+		LastName:  dto.LastName,
+		Email:     dto.Email,
+		Password:  dto.Password,
+	}
+
+	// Since RegisterCustomer creates both, we use it and then find the identity
+	_, err = s.RegisterCustomer(regDTO)
+	if err != nil {
+		return nil, err
+	}
+
+	newIdentity, err := s.authRepo.FindIdentityByEmail(dto.Email)
+	if err != nil {
+		return nil, fmt.Errorf("could not find newly created identity: %w", err)
+	}
+
+	// 4. Delete the guest session
+	if err := s.guestService.DeleteSession(dto.GuestSessionToken); err != nil {
+		fmt.Printf("Warning: failed to delete guest session %s after conversion: %v\n", dto.GuestSessionToken, err)
+	}
+
+	return newIdentity, nil
 }
 
 // UpdatePreferences updates a customer's preferences.

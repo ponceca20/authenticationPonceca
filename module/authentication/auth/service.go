@@ -36,6 +36,11 @@ func NewAuthService(repo AuthRepository, jwtService *utils.JWTService) AuthServi
 
 // Register handles the business logic for creating a new identity.
 func (s *authService) Register(dto *RegisterDTO) (*models.Identity, error) {
+	// Validate password complexity
+	if err := utils.ValidatePassword(dto.Password); err != nil {
+		return nil, err
+	}
+
 	// Check if identity already exists
 	existing, err := s.repo.FindIdentityByEmail(dto.Email)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -69,7 +74,9 @@ func (s *authService) Register(dto *RegisterDTO) (*models.Identity, error) {
 
 // Login handles the business logic for authenticating an identity and generating tokens.
 func (s *authService) Login(dto *LoginDTO) (*TokenResponseDTO, error) {
-	// Find identity by email
+	const maxLoginAttempts = 5
+	const lockoutDuration = 15 * time.Minute
+
 	identity, err := s.repo.FindIdentityByEmail(dto.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -78,19 +85,49 @@ func (s *authService) Login(dto *LoginDTO) (*TokenResponseDTO, error) {
 		return nil, err
 	}
 
+	// Check if account is currently locked
+	if identity.LockedUntil != nil && identity.LockedUntil.After(time.Now()) {
+		return nil, fmt.Errorf("account is locked until %v", identity.LockedUntil)
+	}
+
 	// Check password
 	if !utils.CheckPasswordHash(dto.Password, identity.PasswordHash) {
-		// Here you might want to increment a failed login counter
+		identity.FailedLoginAttempts++
+		if identity.FailedLoginAttempts >= maxLoginAttempts {
+			lockedUntil := time.Now().Add(lockoutDuration)
+			identity.LockedUntil = &lockedUntil
+		}
+		if err := s.repo.UpdateIdentity(identity); err != nil {
+			// Log the update error but still return invalid credentials
+			fmt.Printf("Error updating identity after failed login: %v\n", err)
+		}
 		return nil, errors.New("invalid credentials")
 	}
 
-	// Get user contexts
-	identity, memberships, customer, err := s.repo.GetFullIdentityContext(identity.ID)
+	// Password is correct, reset failure counter if needed
+	if identity.FailedLoginAttempts > 0 || identity.LockedUntil != nil {
+		identity.FailedLoginAttempts = 0
+		identity.LockedUntil = nil
+		if err := s.repo.UpdateIdentity(identity); err != nil {
+			// Log the update error but proceed with login
+			fmt.Printf("Error resetting failed login attempts: %v\n", err)
+		}
+	}
+
+	// Update LastLoginAt timestamp
+	now := time.Now()
+	identity.LastLoginAt = &now
+	if err := s.repo.UpdateIdentity(identity); err != nil {
+		fmt.Printf("Error updating last login time: %v\n", err)
+	}
+
+	// Get user contexts for token generation
+	fullIdentity, memberships, customer, err := s.repo.GetFullIdentityContext(identity.ID)
 	if err != nil {
 		return nil, errors.New("failed to retrieve user context")
 	}
 
-	return s._generateTokenResponse(identity, memberships, customer)
+	return s._generateTokenResponse(fullIdentity, memberships, customer)
 }
 
 // RefreshToken handles the logic for refreshing an access token.

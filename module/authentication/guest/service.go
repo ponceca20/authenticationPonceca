@@ -14,6 +14,7 @@ type GuestService interface {
 	CreateGuestSession() (*models.GuestSession, error)
 	GetSession(token string) (*models.GuestSession, error)
 	UpdateCart(token, cartData string) (*models.GuestSession, error)
+	DeleteSession(token string) error
 }
 
 type guestService struct {
@@ -44,6 +45,11 @@ func (s *guestService) CreateGuestSession() (*models.GuestSession, error) {
 	}
 
 	return session, nil
+}
+
+// DeleteSession removes a guest session.
+func (s *guestService) DeleteSession(token string) error {
+	return s.repo.DeleteSession(token)
 }
 
 // GetSession retrieves a guest session by its token.

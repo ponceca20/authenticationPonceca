@@ -10,6 +10,7 @@ import (
 // CustomerRepository defines the interface for database operations related to customers.
 type CustomerRepository interface {
 	CreateCustomer(identity *models.Identity, profile *models.CustomerProfile) error
+	CreateProfileForIdentity(profile *models.CustomerProfile) error
 	FindProfileByIdentityID(identityID string) (*models.CustomerProfile, error)
 	AddShippingAddress(address *models.ShippingAddress) error
 	ListShippingAddresses(profileID string) ([]models.ShippingAddress, error)
@@ -43,6 +44,11 @@ func (r *customerRepository) CreateCustomer(identity *models.Identity, profile *
 
 		return nil
 	})
+}
+
+// CreateProfileForIdentity creates just the customer profile for an existing identity.
+func (r *customerRepository) CreateProfileForIdentity(profile *models.CustomerProfile) error {
+	return r.db.Create(profile).Error
 }
 
 // FindProfileByIdentityID finds a customer profile using the associated identity's ID.

@@ -70,5 +70,14 @@ type ForgotPasswordDTO struct {
 // ResetPasswordDTO defines the data structure for a password reset request.
 type ResetPasswordDTO struct {
 	Token       string `json:"token" validate:"required"`
-	NewPassword string `json:"new_password" validate:"required,min=8"`
+	NewPassword string `json:"new_password" validate:"required"` // Validation handled by service
+}
+
+// ConvertGuestDTO defines the data for converting a guest session to a full user.
+type ConvertGuestDTO struct {
+	GuestSessionToken string `json:"guest_session_token" validate:"required"`
+	FirstName         string `json:"first_name" validate:"required"`
+	LastName          string `json:"last_name" validate:"required"`
+	Email             string `json:"email" validate:"required,email"`
+	Password          string `json:"password" validate:"required"`
 }
