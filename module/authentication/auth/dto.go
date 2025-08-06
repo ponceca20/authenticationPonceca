@@ -73,6 +73,22 @@ type ResetPasswordDTO struct {
 	NewPassword string `json:"new_password" validate:"required"` // Validation handled by service
 }
 
+// ChangePasswordDTO defines the data structure for changing password (authenticated user).
+type ChangePasswordDTO struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8,max=100"`
+}
+
+// VerifyEmailDTO defines the data structure for email verification.
+type VerifyEmailDTO struct {
+	Token string `json:"token" validate:"required"`
+}
+
+// ResendVerificationDTO defines the data structure for resending verification email.
+type ResendVerificationDTO struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
 // ConvertGuestDTO defines the data for converting a guest session to a full user.
 type ConvertGuestDTO struct {
 	GuestSessionToken string `json:"guest_session_token" validate:"required"`

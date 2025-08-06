@@ -14,6 +14,13 @@ type AcceptInvitationDTO struct {
 	Password  string `json:"password" validate:"required,min=8"`
 }
 
+// AcceptInvitationByTokenDTO is used to accept an invitation using only the token from URL.
+type AcceptInvitationByTokenDTO struct {
+	FirstName string `json:"first_name" validate:"required"`
+	LastName  string `json:"last_name" validate:"required"`
+	Password  string `json:"password" validate:"required,min=8"`
+}
+
 // InvitationResponseDTO is a public representation of a sent invitation.
 type InvitationResponseDTO struct {
 	ID        string `json:"id"`

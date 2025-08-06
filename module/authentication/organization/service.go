@@ -21,6 +21,9 @@ type OrganizationService interface {
 	UpdateOrganization(orgID string, dto *UpdateOrganizationDTO) (*models.Organization, error)
 	DeleteOrganization(orgID string) error
 	RemoveMember(orgID, userID string) error
+	AddMember(orgSlug, userID, roleID string) error
+	ListMembers(orgSlug string) ([]models.OrganizationalMembership, error)
+	ChangeUserRole(orgSlug, userID, newRoleID string) error
 }
 
 type organizationService struct {
@@ -174,4 +177,61 @@ func (s *organizationService) RemoveMember(orgID, userID string) error {
 	// We could add more logic here, e.g., checking if the user being removed
 	// is the last owner of the organization.
 	return s.orgRepo.RemoveMembership(orgID, userID)
+}
+
+// AddMember adds a user to an organization with a specific role.
+func (s *organizationService) AddMember(orgSlug, userID, roleID string) error {
+	// Find the organization by slug
+	org, err := s.orgRepo.FindOrganizationBySlug(orgSlug)
+	if err != nil {
+		return errors.New("organization not found")
+	}
+
+	// Verify the user exists
+	_, err = s.authRepo.FindIdentityByID(userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	// Create the membership
+	membership := &models.OrganizationalMembership{
+		ID:             uuid.New().String(),
+		IdentityID:     userID,
+		OrganizationID: org.ID,
+		RoleID:         roleID,
+		IsActive:       true,
+		ActiveFrom:     time.Now(),
+	}
+
+	return s.orgRepo.CreateMembership(membership)
+}
+
+// ListMembers returns all members of an organization.
+func (s *organizationService) ListMembers(orgSlug string) ([]models.OrganizationalMembership, error) {
+	// Find the organization by slug
+	org, err := s.orgRepo.FindOrganizationBySlug(orgSlug)
+	if err != nil {
+		return nil, errors.New("organization not found")
+	}
+
+	return s.orgRepo.ListMemberships(org.ID)
+}
+
+// ChangeUserRole changes a user's role within an organization.
+func (s *organizationService) ChangeUserRole(orgSlug, userID, newRoleID string) error {
+	// Find the organization by slug
+	org, err := s.orgRepo.FindOrganizationBySlug(orgSlug)
+	if err != nil {
+		return errors.New("organization not found")
+	}
+
+	// Find the existing membership
+	membership, err := s.orgRepo.FindMembership(org.ID, userID)
+	if err != nil {
+		return errors.New("user is not a member of this organization")
+	}
+
+	// Update the role
+	membership.RoleID = newRoleID
+	return s.orgRepo.UpdateMembership(membership)
 }

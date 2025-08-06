@@ -82,8 +82,12 @@ func RegisterRoutes(app *fiber.App) {
 	authPublic.Post("/refresh", authHandler.RefreshToken)
 	authPublic.Post("/forgot-password", authHandler.ForgotPassword)
 	authPublic.Post("/reset-password", authHandler.ResetPassword)
+	authPublic.Post("/verify-email", authHandler.VerifyEmail)               // Added email verification
+	authPublic.Post("/resend-verification", authHandler.ResendVerification) // Added resend verification
 
 	v1.Post("/organizations", orgHandler.CreateOrganization)
+	// TODO: Add route to list user's organizations
+	// p.Get("/organizations", orgHandler.ListMyOrganizations)
 	v1.Post("/customers/register", customerHandler.Register)
 	v1.Post("/guests/session", guestHandler.CreateSession)
 	v1.Post("/invitations/accept", invitationHandler.AcceptInvitation)
@@ -92,8 +96,9 @@ func RegisterRoutes(app *fiber.App) {
 	p := v1.Group("/", middleware.SmartAuthMiddleware())
 
 	p.Post("/auth/logout", authHandler.Logout)
-	p.Get("/auth/me", profileHandler.GetMyProfile)    // Added GET /me
-	p.Put("/auth/me", profileHandler.UpdateMyProfile) // Added PUT /me
+	p.Get("/auth/me", profileHandler.GetMyProfile)              // Added GET /me
+	p.Put("/auth/me", profileHandler.UpdateMyProfile)           // Added PUT /me
+	p.Post("/auth/change-password", authHandler.ChangePassword) // Added change password route (POST)
 
 	// Profile routes
 	profileRoutes := p.Group("/profiles")
@@ -114,18 +119,29 @@ func RegisterRoutes(app *fiber.App) {
 
 	// Organization-specific routes
 	orgScoped := p.Group("/org/:slug")
+	orgScoped.Get("/", orgHandler.GetOrganization) // Added GET organization info
 	orgScoped.Delete("/", orgHandler.DeleteOrganization)
 	orgScoped.Put("/", orgHandler.UpdateOrganization)
+
+	// Organization membership management
+	orgScoped.Get("/members", orgHandler.ListMembers)                 // List organization members
+	orgScoped.Post("/members", orgHandler.AddMember)                  // Add member to organization
+	orgScoped.Delete("/members/:userId", orgHandler.RemoveMember)     // Remove member from organization
+	orgScoped.Put("/members/:userId/role", orgHandler.ChangeUserRole) // Change user role in organization
 
 	userRoutes := orgScoped.Group("/users")
 	userRoutes.Get("/", userHandler.ListUsers)
 	userRoutes.Get("/:id", userHandler.GetUser)
 	userRoutes.Put("/:id", userHandler.UpdateUser)
 	userRoutes.Put("/:id/status", userHandler.UpdateUserStatus)
+	// TODO: Add user management routes
+	// userRoutes.Delete("/:id", userHandler.RemoveUserFromOrganization)
+	// userRoutes.Put("/:id/role", userHandler.ChangeUserRole)
 
 	roleRoutes := orgScoped.Group("/roles")
 	roleRoutes.Post("/", roleHandler.CreateRole)
 	roleRoutes.Get("/", roleHandler.ListRoles)
+	roleRoutes.Get("/:id", roleHandler.GetRole)
 	roleRoutes.Put("/:id", roleHandler.UpdateRole)
 	roleRoutes.Delete("/:id", roleHandler.DeleteRole)
 	roleRoutes.Get("/:id/users", roleHandler.ListUsersInRole)
@@ -140,7 +156,13 @@ func RegisterRoutes(app *fiber.App) {
 	invitationRoutes := orgScoped.Group("/invitations")
 	invitationRoutes.Post("/", invitationHandler.CreateInvitation)
 	invitationRoutes.Get("/", invitationHandler.ListInvitations)
+	invitationRoutes.Get("/:id", invitationHandler.GetInvitation)
 	invitationRoutes.Delete("/:id", invitationHandler.CancelInvitation)
+	invitationRoutes.Post("/:id/resend", invitationHandler.ResendInvitation) // Advanced: resend invitation
+
+	// Public invitation routes (no authentication required)
+	v1.Get("/invitations/verify/:token", invitationHandler.VerifyInvitationToken)   // Advanced: verify token
+	v1.Put("/invitations/:token/accept", invitationHandler.AcceptInvitationByToken) // Advanced: accept by token
 
 	// Unified, Integration, and Admin routes (placeholders)
 	p.Get("/unified/dashboard", unifiedHandler.GetDashboard)

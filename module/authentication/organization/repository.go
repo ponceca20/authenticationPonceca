@@ -15,6 +15,10 @@ type OrganizationRepository interface {
 	UpdateOrganization(org *models.Organization) error
 	DeleteOrganization(org *models.Organization) error
 	RemoveMembership(orgID, userID string) error
+	CreateMembership(membership *models.OrganizationalMembership) error
+	ListMemberships(orgID string) ([]models.OrganizationalMembership, error)
+	FindMembership(orgID, userID string) (*models.OrganizationalMembership, error)
+	UpdateMembership(membership *models.OrganizationalMembership) error
 }
 
 type organizationRepository struct {
@@ -97,4 +101,32 @@ func (r *organizationRepository) DeleteOrganization(org *models.Organization) er
 // RemoveMembership performs a soft delete on an organizational membership.
 func (r *organizationRepository) RemoveMembership(orgID, userID string) error {
 	return r.db.Where("organization_id = ? AND identity_id = ?", orgID, userID).Delete(&models.OrganizationalMembership{}).Error
+}
+
+// CreateMembership creates a new organizational membership.
+func (r *organizationRepository) CreateMembership(membership *models.OrganizationalMembership) error {
+	return r.db.Create(membership).Error
+}
+
+// ListMemberships retrieves all memberships for an organization.
+func (r *organizationRepository) ListMemberships(orgID string) ([]models.OrganizationalMembership, error) {
+	var memberships []models.OrganizationalMembership
+	if err := r.db.Preload("Identity").Preload("Role").Where("organization_id = ? AND is_active = ?", orgID, true).Find(&memberships).Error; err != nil {
+		return nil, err
+	}
+	return memberships, nil
+}
+
+// FindMembership finds a specific membership by organization and user.
+func (r *organizationRepository) FindMembership(orgID, userID string) (*models.OrganizationalMembership, error) {
+	var membership models.OrganizationalMembership
+	if err := r.db.Where("organization_id = ? AND identity_id = ? AND is_active = ?", orgID, userID, true).First(&membership).Error; err != nil {
+		return nil, err
+	}
+	return &membership, nil
+}
+
+// UpdateMembership saves changes to an organizational membership.
+func (r *organizationRepository) UpdateMembership(membership *models.OrganizationalMembership) error {
+	return r.db.Save(membership).Error
 }

@@ -14,6 +14,7 @@ import (
 // RoleService defines the interface for role-related business logic.
 type RoleService interface {
 	CreateRole(orgID string, dto *RoleDTO) (*models.Role, error)
+	GetRole(orgID, roleID string) (*models.Role, error)
 	ListRoles(orgID string) ([]RoleResponseDTO, error)
 	UpdateRole(orgID, roleID string, dto *RoleDTO) (*models.Role, error)
 	DeleteRole(orgID, roleID string) error
@@ -71,6 +72,27 @@ func (s *roleService) CreateRole(orgID string, dto *RoleDTO) (*models.Role, erro
 	// Create the role and its associations in a transaction
 	if err := s.repo.CreateRole(role, dbPermissions); err != nil {
 		return nil, fmt.Errorf("failed to create role: %w", err)
+	}
+
+	return role, nil
+}
+
+// GetRole retrieves a role by its ID within the specified organization.
+func (s *roleService) GetRole(orgID, roleID string) (*models.Role, error) {
+	// Validate the organization ID format
+	if _, err := uuid.Parse(orgID); err != nil {
+		return nil, errors.New("invalid organization ID format")
+	}
+
+	// Validate the role ID format
+	if _, err := uuid.Parse(roleID); err != nil {
+		return nil, errors.New("invalid role ID format")
+	}
+
+	// Find the role in the database
+	role, err := s.repo.FindRoleByID(orgID, roleID)
+	if err != nil {
+		return nil, errors.New("role not found")
 	}
 
 	return role, nil

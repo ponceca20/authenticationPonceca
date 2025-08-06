@@ -19,6 +19,9 @@ type AuthService interface {
 	Logout(dto *RefreshTokenDTO) error
 	ForgotPassword(dto *ForgotPasswordDTO) error
 	ResetPassword(dto *ResetPasswordDTO) error
+	ChangePassword(identityID string, dto *ChangePasswordDTO) error
+	VerifyEmail(dto *VerifyEmailDTO) error
+	ResendVerification(dto *ResendVerificationDTO) error
 }
 
 type authService struct {
@@ -268,6 +271,110 @@ func (s *authService) ResetPassword(dto *ResetPasswordDTO) error {
 
 	// Delete the token so it can't be used again
 	_ = s.repo.DeletePasswordResetToken(resetToken)
+
+	return nil
+}
+
+// ChangePassword handles changing the password for an authenticated user.
+func (s *authService) ChangePassword(identityID string, dto *ChangePasswordDTO) error {
+	// Validate new password complexity
+	if err := utils.ValidatePassword(dto.NewPassword); err != nil {
+		return err
+	}
+
+	// Find the identity
+	identity, err := s.repo.FindIdentityByID(identityID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
+		return errors.New("failed to retrieve user")
+	}
+
+	// Verify current password
+	if !utils.CheckPasswordHash(dto.CurrentPassword, identity.PasswordHash) {
+		return errors.New("current password is incorrect")
+	}
+
+	// Ensure new password is different from current password
+	if utils.CheckPasswordHash(dto.NewPassword, identity.PasswordHash) {
+		return errors.New("new password must be different from current password")
+	}
+
+	// Hash new password
+	newHashedPassword, err := utils.HashPassword(dto.NewPassword)
+	if err != nil {
+		return errors.New("failed to hash new password")
+	}
+
+	// Update password
+	identity.PasswordHash = newHashedPassword
+	if err := s.repo.UpdateIdentity(identity); err != nil {
+		return errors.New("failed to update password")
+	}
+
+	return nil
+}
+
+// VerifyEmail handles the verification of email address using a token.
+func (s *authService) VerifyEmail(dto *VerifyEmailDTO) error {
+	// Find the verification token
+	verificationToken, err := s.repo.FindEmailVerificationToken(dto.Token)
+	if err != nil {
+		return errors.New("invalid or expired verification token")
+	}
+
+	// Find the identity
+	identity, err := s.repo.FindIdentityByID(verificationToken.IdentityID)
+	if err != nil {
+		return errors.New("user associated with token not found")
+	}
+
+	// Mark email as verified
+	now := time.Now()
+	identity.EmailVerifiedAt = &now
+	if err := s.repo.UpdateIdentity(identity); err != nil {
+		return errors.New("failed to verify email")
+	}
+
+	// Delete the verification token
+	_ = s.repo.DeleteEmailVerificationToken(verificationToken)
+
+	return nil
+}
+
+// ResendVerification handles resending email verification token.
+func (s *authService) ResendVerification(dto *ResendVerificationDTO) error {
+	identity, err := s.repo.FindIdentityByEmail(dto.Email)
+	if err != nil {
+		// Don't reveal if the user exists or not
+		return nil
+	}
+
+	// Check if email is already verified
+	if identity.EmailVerifiedAt != nil {
+		return errors.New("email is already verified")
+	}
+
+	// Generate a secure token for email verification
+	token, err := utils.GenerateSecureToken(32)
+	if err != nil {
+		return errors.New("could not generate verification token")
+	}
+
+	verificationToken := &models.EmailVerificationToken{
+		ID:         uuid.New().String(),
+		IdentityID: identity.ID,
+		Token:      token,
+		ExpiresAt:  time.Now().Add(24 * time.Hour), // 24 hour expiry
+	}
+
+	if err := s.repo.CreateEmailVerificationToken(verificationToken); err != nil {
+		return errors.New("could not save verification token")
+	}
+
+	// In a real app, email the token to the user
+	// log.Printf("Email verification token for %s: %s", identity.Email, token)
 
 	return nil
 }

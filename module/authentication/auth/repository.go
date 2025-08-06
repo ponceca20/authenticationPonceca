@@ -20,6 +20,9 @@ type AuthRepository interface {
 	CreatePasswordResetToken(token *models.PasswordResetToken) error
 	FindPasswordResetToken(tokenValue string) (*models.PasswordResetToken, error)
 	DeletePasswordResetToken(token *models.PasswordResetToken) error
+	CreateEmailVerificationToken(token *models.EmailVerificationToken) error
+	FindEmailVerificationToken(tokenValue string) (*models.EmailVerificationToken, error)
+	DeleteEmailVerificationToken(token *models.EmailVerificationToken) error
 }
 
 // authRepository is the implementation of AuthRepository.
@@ -122,5 +125,24 @@ func (r *authRepository) FindPasswordResetToken(tokenValue string) (*models.Pass
 
 // DeletePasswordResetToken deletes a password reset token after it has been used.
 func (r *authRepository) DeletePasswordResetToken(token *models.PasswordResetToken) error {
+	return r.db.Delete(token).Error
+}
+
+// --- Email Verification ---
+
+// CreateEmailVerificationToken saves a new email verification token.
+func (r *authRepository) CreateEmailVerificationToken(token *models.EmailVerificationToken) error {
+	return r.db.Create(token).Error
+}
+
+// FindEmailVerificationToken finds an email verification token by its value.
+func (r *authRepository) FindEmailVerificationToken(tokenValue string) (*models.EmailVerificationToken, error) {
+	var token models.EmailVerificationToken
+	err := r.db.Where("token = ? AND expires_at > ?", tokenValue, time.Now()).First(&token).Error
+	return &token, err
+}
+
+// DeleteEmailVerificationToken deletes an email verification token after it has been used.
+func (r *authRepository) DeleteEmailVerificationToken(token *models.EmailVerificationToken) error {
 	return r.db.Delete(token).Error
 }

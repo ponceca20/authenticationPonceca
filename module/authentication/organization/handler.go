@@ -1,6 +1,7 @@
 package organization
 
 import (
+	"practicev2/module/authentication/middleware"
 	"practicev2/module/authentication/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -40,10 +41,37 @@ func (h *OrganizationHandler) CreateOrganization(c *fiber.Ctx) error {
 // GetOrganization is the handler for retrieving a single organization by its slug.
 func (h *OrganizationHandler) GetOrganization(c *fiber.Ctx) error {
 	slug := c.Params("slug")
+
+	// Check authentication context first
+	authCtx := c.Locals("authContext")
+	if authCtx == nil {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Authentication required")
+	}
+
+	ctx, ok := authCtx.(*middleware.AuthContext)
+	if !ok || ctx.IsGuest {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Authentication required")
+	}
+
+	// Try to get organization
 	org, err := h.service.GetOrganizationBySlug(slug)
 	if err != nil {
 		return utils.SendError(c, fiber.StatusNotFound, "Organization not found", err)
 	}
+
+	// Check if user has access to this organization
+	hasAccess := false
+	for _, membership := range ctx.Memberships {
+		if membership.Organization.Slug == slug {
+			hasAccess = true
+			break
+		}
+	}
+
+	if !hasAccess {
+		return utils.SendError(c, fiber.StatusForbidden, "Access denied to this organization")
+	}
+
 	return utils.SendSuccess(c, fiber.StatusOK, ToOrganizationResponseDTO(org))
 }
 
@@ -119,4 +147,79 @@ func (h *OrganizationHandler) RemoveMember(c *fiber.Ctx) error {
 	}
 
 	return utils.SendSuccess(c, fiber.StatusNoContent, nil)
+}
+
+// AddMember is the handler for adding a user to an organization.
+func (h *OrganizationHandler) AddMember(c *fiber.Ctx) error {
+	orgSlug := c.Params("slug")
+	if orgSlug == "" {
+		return utils.SendError(c, fiber.StatusBadRequest, "Organization slug is required")
+	}
+
+	var dto struct {
+		UserID string `json:"user_id" validate:"required,uuid"`
+		RoleID string `json:"role_id" validate:"required,uuid"`
+	}
+
+	if err := c.BodyParser(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
+	}
+
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errs})
+	}
+
+	if err := h.service.AddMember(orgSlug, dto.UserID, dto.RoleID); err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to add member", err)
+	}
+
+	return utils.SendSuccess(c, fiber.StatusCreated, nil, "Member added successfully")
+}
+
+// ListMembers is the handler for listing organization members.
+func (h *OrganizationHandler) ListMembers(c *fiber.Ctx) error {
+	orgSlug := c.Params("slug")
+	if orgSlug == "" {
+		return utils.SendError(c, fiber.StatusBadRequest, "Organization slug is required")
+	}
+
+	members, err := h.service.ListMembers(orgSlug)
+	if err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to retrieve members", err)
+	}
+
+	// Convert to DTOs
+	var memberDTOs []MemberResponseDTO
+	for _, member := range members {
+		memberDTOs = append(memberDTOs, ToMemberResponseDTO(&member))
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, memberDTOs)
+}
+
+// ChangeUserRole is the handler for changing a user's role in an organization.
+func (h *OrganizationHandler) ChangeUserRole(c *fiber.Ctx) error {
+	orgSlug := c.Params("slug")
+	userID := c.Params("userId")
+	if orgSlug == "" || userID == "" {
+		return utils.SendError(c, fiber.StatusBadRequest, "Organization slug and user ID are required")
+	}
+
+	var dto struct {
+		NewRoleID string `json:"new_role_id" validate:"required,uuid"`
+	}
+
+	if err := c.BodyParser(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
+	}
+
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errs})
+	}
+
+	if err := h.service.ChangeUserRole(orgSlug, userID, dto.NewRoleID); err != nil {
+		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to change user role", err)
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, nil, "User role changed successfully")
 }

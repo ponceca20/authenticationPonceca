@@ -16,6 +16,7 @@ type InvitationRepository interface {
 	FindInvitationByID(orgID, invID string) (*models.Invitation, error)
 	DeleteInvitation(invitation *models.Invitation) error
 	ValidateRoleInOrganization(orgID, roleID string) (*models.Role, error)
+	UpdateInvitation(invitation *models.Invitation) error
 }
 
 type invitationRepository struct {
@@ -101,5 +102,16 @@ func (r *invitationRepository) DeleteInvitation(invitation *models.Invitation) e
 func (r *invitationRepository) ValidateRoleInOrganization(orgID, roleID string) (*models.Role, error) {
 	var role models.Role
 	err := r.db.Where("id = ? AND organization_id = ?", roleID, orgID).First(&role).Error
-	return &role, err
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return &role, nil
+}
+
+// UpdateInvitation saves changes to an invitation.
+func (r *invitationRepository) UpdateInvitation(invitation *models.Invitation) error {
+	return r.db.Save(invitation).Error
 }

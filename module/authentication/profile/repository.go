@@ -43,7 +43,18 @@ func (r *profileRepository) FindOrCreateUserProfile(profile *models.UserProfile)
 	// First try to find existing profile
 	err := r.db.Where("identity_id = ?", profile.IdentityID).First(profile).Error
 	if err == nil {
-		// Profile found, return it
+		// Profile found, check and fix JSON fields if needed
+		needsUpdate := false
+		if profile.Socials == "" {
+			profile.Socials = "{}"
+			needsUpdate = true
+		}
+
+		// Update the profile if any JSON fields were fixed
+		if needsUpdate {
+			return r.db.Save(profile).Error
+		}
+
 		return nil
 	}
 
@@ -53,14 +64,18 @@ func (r *profileRepository) FindOrCreateUserProfile(profile *models.UserProfile)
 		if profile.ID == "" {
 			profile.ID = uuid.New().String()
 		}
+
+		// Initialize JSON fields with valid empty JSON to avoid MySQL errors
+		if profile.Socials == "" {
+			profile.Socials = "{}"
+		}
+
 		return r.db.Create(profile).Error
 	}
 
 	// Return any other error
 	return err
-}
-
-// UpdateUserProfile saves changes to a UserProfile model.
+} // UpdateUserProfile saves changes to a UserProfile model.
 func (r *profileRepository) UpdateUserProfile(profile *models.UserProfile) error {
 	return r.db.Save(profile).Error
 }

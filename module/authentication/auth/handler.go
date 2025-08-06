@@ -126,3 +126,63 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 
 	return utils.SendSuccess(c, fiber.StatusOK, nil, "Password has been reset successfully.")
 }
+
+// ChangePassword is the handler for changing password (authenticated user).
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	var dto ChangePasswordDTO
+	if err := c.BodyParser(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
+	}
+
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errs})
+	}
+
+	// Get identity ID from JWT token (set by middleware)
+	identityID := c.Locals("identity_id")
+	if identityID == nil {
+		return utils.SendError(c, fiber.StatusUnauthorized, "Authentication required")
+	}
+
+	if err := h.service.ChangePassword(identityID.(string), &dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, nil, "Password changed successfully")
+}
+
+// VerifyEmail is the handler for verifying email address with token.
+func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
+	var dto VerifyEmailDTO
+	if err := c.BodyParser(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
+	}
+
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errs})
+	}
+
+	if err := h.service.VerifyEmail(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, nil, "Email verified successfully")
+}
+
+// ResendVerification is the handler for resending email verification.
+func (h *AuthHandler) ResendVerification(c *fiber.Ctx) error {
+	var dto ResendVerificationDTO
+	if err := c.BodyParser(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
+	}
+
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"errors": errs})
+	}
+
+	if err := h.service.ResendVerification(&dto); err != nil {
+		return utils.SendError(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	return utils.SendSuccess(c, fiber.StatusOK, nil, "If an unverified account with that email exists, a verification link has been sent")
+}

@@ -1,8 +1,10 @@
 package profile
 
 import (
+	"fmt"
 	"practicev2/module/authentication/middleware"
 	"practicev2/module/authentication/utils"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -44,9 +46,39 @@ func (h *ProfileHandler) UpdateMyProfile(c *fiber.Ctx) error {
 		return utils.SendError(c, fiber.StatusBadRequest, "Invalid request body", err)
 	}
 
+	// Validate the DTO
+	if errs := utils.ValidateStruct(&dto); errs != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"status": "error",
+			"errors": errs,
+		})
+	}
+
 	updatedProfile, err := h.service.UpdateProfile(authCtx.Identity.ID, &dto)
 	if err != nil {
-		return utils.SendError(c, fiber.StatusInternalServerError, "Failed to update profile", err)
+		// Log the actual error for debugging
+		fmt.Printf("Profile update error: %v\n", err)
+
+		// Handle specific error types
+		errMsg := err.Error()
+
+		// User not found
+		if strings.Contains(errMsg, "user not found") {
+			return utils.SendError(c, fiber.StatusNotFound, "User not found", err)
+		}
+
+		// Validation errors
+		if strings.Contains(errMsg, "validation failed") {
+			return utils.SendError(c, fiber.StatusBadRequest, "Validation failed", err)
+		}
+
+		// Database/transaction errors
+		if strings.Contains(errMsg, "failed to update") || strings.Contains(errMsg, "failed to find") {
+			return utils.SendError(c, fiber.StatusInternalServerError, "Failed to update profile", err)
+		}
+
+		// Default to bad request for other errors
+		return utils.SendError(c, fiber.StatusBadRequest, "Failed to update profile", err)
 	}
 
 	return utils.SendSuccess(c, fiber.StatusOK, updatedProfile, "Profile updated successfully")
