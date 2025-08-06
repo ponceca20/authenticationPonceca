@@ -383,6 +383,12 @@ func (m *UnifiedAuthMiddleware) handleAuthError(c *fiber.Ctx, errorType string, 
 
 // logAccess registra el acceso para auditoría
 func (m *UnifiedAuthMiddleware) logAccess(authCtx *AuthContext, permission, path string, success bool) {
+	// Verificar si la base de datos está disponible
+	if m.db == nil {
+		// En entornos de test o sin DB configurada, no loguear
+		return
+	}
+
 	auditLog := &models.AuditLog{
 		ID:        uuid.New().String(), // Generar ID único
 		Action:    "api_access",
@@ -508,4 +514,9 @@ func GetCurrentRole(c *fiber.Ctx) (*models.Role, bool) {
 		return nil, false
 	}
 	return ctx.CurrentRole, true
+}
+
+// GetRBACEngine retorna el motor RBAC dinámico para uso externo
+func (m *UnifiedAuthMiddleware) GetRBACEngine() *rbac.DynamicRBACEngine {
+	return m.rbacEngine
 }

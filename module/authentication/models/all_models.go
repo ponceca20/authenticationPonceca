@@ -171,7 +171,43 @@ func (Permission) TableName() string {
 	return "permission"
 }
 
-// SystemResources defines the available resources and their actions in the system.
+//=============================================================================
+// SISTEMA DE CONFIGURACIÓN DINÁMICO DE RECURSOS POR ORGANIZACIÓN
+// =============================================================================
+
+// OrganizationModuleConfig permite a cada organización personalizar módulos
+type OrganizationModuleConfig struct {
+	ID             string       `json:"id" gorm:"primaryKey;type:varchar(36)"`
+	OrganizationID string       `json:"organization_id" gorm:"index;type:varchar(36);not null"`
+	Organization   Organization `json:"organization" gorm:"foreignKey:OrganizationID"`
+	ModuleName     string       `json:"module_name" gorm:"not null;size:100;index"`
+	IsEnabled      bool         `json:"is_enabled" gorm:"default:true;index"`
+
+	// Configuración JSON del módulo
+	Resources    string `json:"resources" gorm:"type:json"`     // {"expenses": ["create", "read", "approve"]}
+	DefaultRoles string `json:"default_roles" gorm:"type:json"` // Roles predefinidos del módulo
+	Settings     string `json:"settings" gorm:"type:json"`      // Configuración específica
+
+	// Metadata
+	Version     string   `json:"version" gorm:"size:20;default:'1.0.0'"`
+	InstalledBy string   `json:"installed_by" gorm:"type:varchar(36)"`
+	Installer   Identity `json:"installer,omitempty" gorm:"foreignKey:InstalledBy"`
+
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `json:"deleted_at,omitempty" gorm:"index"`
+}
+
+// TableName especifica el nombre de tabla
+func (OrganizationModuleConfig) TableName() string {
+	return "organization_module_config"
+}
+
+//=============================================================================
+// RECURSOS BASE DEL SISTEMA - MANTIENE COMPATIBILIDAD
+// =============================================================================
+
+// SystemResources define recursos base del sistema (MANTENER PARA COMPATIBILIDAD)
 var SystemResources = map[string][]string{
 	"users":        {"create", "read", "update", "delete", "invite", "suspend"},
 	"students":     {"read", "update", "grade", "report", "communicate"},
@@ -186,6 +222,49 @@ var SystemResources = map[string][]string{
 	"audit":        {"read", "export"},
 	"settings":     {"read", "update"},
 	"integrations": {"read", "configure"},
+}
+
+// ModuleResources organiza recursos por módulos para configuración dinámica
+var ModuleResources = map[string]map[string][]string{
+	"authentication": {
+		"users":       {"create", "read", "update", "delete", "invite", "suspend"},
+		"students":    {"read", "update", "grade", "report", "communicate"},
+		"teachers":    {"read", "update", "assign", "evaluate"},
+		"departments": {"create", "read", "update", "delete", "manage"},
+		"audit":       {"read", "export"},
+		"settings":    {"read", "update"},
+	},
+	"ecommerce": {
+		"products":  {"create", "read", "update", "delete", "price", "inventory"},
+		"orders":    {"create", "read", "update", "process", "refund"},
+		"customers": {"read", "update", "communicate", "discount"},
+		"inventory": {"read", "update", "count", "transfer", "adjust"},
+	},
+	"education": {
+		"students": {"read", "update", "grade", "report", "communicate"},
+		"teachers": {"read", "update", "assign", "evaluate"},
+		"courses":  {"create", "read", "update", "delete", "enroll"},
+		"grades":   {"create", "read", "update", "approve", "publish"},
+	},
+	"expenses": {
+		"expenses":   {"create", "read", "update", "delete", "approve", "reject"},
+		"budgets":    {"create", "read", "update", "approve", "monitor", "report"},
+		"categories": {"create", "read", "update", "delete", "assign"},
+		"approvals":  {"view", "approve", "reject", "delegate"},
+	},
+	"inventory": {
+		"inventory":  {"create", "read", "update", "delete", "transfer", "adjust", "audit"},
+		"warehouses": {"create", "read", "update", "delete", "manage", "assign"},
+		"stock":      {"read", "update", "reserve", "release", "count", "audit"},
+		"transfers":  {"create", "read", "approve", "cancel", "receive", "dispatch"},
+		"purchases":  {"create", "read", "update", "approve", "receive", "cancel"},
+		"suppliers":  {"create", "read", "update", "delete", "evaluate", "block"},
+	},
+	"reports": {
+		"reports":    {"inventory", "financial", "sales", "expenses", "custom", "export"},
+		"analytics":  {"view", "create", "export", "schedule"},
+		"dashboards": {"view", "create", "update", "share"},
+	},
 }
 
 // AuthorizationScopes defines the different levels of access.
